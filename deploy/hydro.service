@@ -1,16 +1,25 @@
 [Unit]
 Description=Hydro Raspberry Pi hydroponics controller
 After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
 WorkingDirectory=%h/hydro
 EnvironmentFile=%h/hydro/.env
 ExecStart=%h/hydro/.venv/bin/uvicorn service.main:app --host $HYDRO_HOST --port $HYDRO_PORT
-Restart=always
+Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=hydro
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h/hydro/data %h/hydro/.venv
 
 [Install]
 WantedBy=default.target

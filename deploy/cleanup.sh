@@ -25,6 +25,15 @@ apt_purge() {
 
 echo "=== Hydro Pi cleanup — removing packages not required for headless operation ==="
 
+echo "--- RealVNC server (remove before desktop packages) ---"
+# realvnc-vnc-server's postrm calls update-desktop-database from desktop-file-utils.
+# Removing it first avoids a broken-package state if desktop-file-utils is pulled out.
+if dpkg-query -W -f='${Status}' realvnc-vnc-server 2>/dev/null | grep -q "install ok installed"; then
+  sh -c 'echo "#!/bin/sh\nexit 0" > /var/lib/dpkg/info/realvnc-vnc-server.postrm'
+  chmod +x /var/lib/dpkg/info/realvnc-vnc-server.postrm
+  DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y realvnc-vnc-server || true
+fi
+
 echo "--- GUI / X11 / Wayland ---"
 apt_purge \
   xserver-xorg xserver-xorg-core xserver-xorg-input-all xserver-xorg-input-libinput \
@@ -35,7 +44,8 @@ apt_purge \
   openbox pcmanfm mousepad \
   xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr \
   rpd-wayland-core rpd-wayland-extras \
-  desktop-file-utils
+  rp-bookshelf rp-prefapps \
+  gvfs gvfs-common gvfs-backends gvfs-daemons gvfs-fuse gvfs-libs
 
 echo "--- Audio / PipeWire ---"
 apt_purge \

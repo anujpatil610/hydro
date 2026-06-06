@@ -45,7 +45,25 @@ class Sensor(ABC):
         return a not-ok Reading instead so the poller can continue."""
 
 
+@dataclass(slots=True, frozen=True)
+class PumpResult:
+    """Outcome of a pump run: how long it ran and the estimated volume moved."""
+
+    ran_for_ms: int
+    estimated_ml: float
+
+
 class Actuator(ABC):
     """A controllable output device."""
 
     name: str
+
+
+class Pump(Actuator):
+    """A dosing pump. Volume (mL) and run time (ms) are interchangeable via flow rate."""
+
+    @abstractmethod
+    def run_for_ms(self, duration_ms: int) -> PumpResult: ...
+
+    @abstractmethod
+    def dose_ml(self, ml: float) -> PumpResult: ...

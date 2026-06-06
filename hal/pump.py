@@ -9,15 +9,8 @@ post-wiring (see docs/calibration.md).
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 
-from hal.base import Actuator
-
-
-@dataclass(slots=True, frozen=True)
-class PumpResult:
-    ran_for_ms: int
-    estimated_ml: float
+from hal.base import Pump, PumpResult
 
 
 def ml_to_ms(ml: float, ml_per_min: float) -> int:
@@ -30,7 +23,7 @@ def ms_to_ml(ms: int, ml_per_min: float) -> float:
     return ms / 60_000 * ml_per_min
 
 
-class MockPump(Actuator):
+class MockPump(Pump):
     """Records dosing without touching hardware. No real sleep, so tests are fast."""
 
     name = "pump"
@@ -55,7 +48,7 @@ class MockPump(Actuator):
         return self.run_for_ms(ml_to_ms(ml, self.ml_per_min))
 
 
-class RealPump(Actuator):
+class RealPump(Pump):
     """Drives the relay on GPIO17. Blocking run; callers should offload from the
     event loop (the service runs it in a threadpool)."""
 

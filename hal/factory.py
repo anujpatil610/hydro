@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from hal.base import Actuator, Sensor
+from hal.base import Pump, Sensor
 
 
 @dataclass(slots=True)
@@ -21,7 +21,7 @@ class Hal:
     ph: Sensor
     tds: Sensor
     temp: Sensor
-    pump: Actuator
+    pump: Pump
 
 
 def build_hal(

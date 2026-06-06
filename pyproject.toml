@@ -21,6 +21,15 @@ hardware = [
     "lgpio>=0.2,<0.3",
 ]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hal*", "service*"]
+exclude = ["service.tests*"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.3,<9",

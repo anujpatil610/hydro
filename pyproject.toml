@@ -1,0 +1,63 @@
+[project]
+name = "hydro"
+version = "0.1.0"
+description = "Raspberry Pi 5 hydroponics controller — Phase 1 (pH/TDS/temp monitoring, dashboard, manual dosing)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.34,<0.35",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "sqlmodel>=0.0.22,<0.1",
+]
+
+[project.optional-dependencies]
+# Real-mode hardware drivers. Installed only on the Pi (do not build on a laptop).
+hardware = [
+    "adafruit-circuitpython-ads1x15>=2.4,<3",
+    "adafruit-blinka>=8,<9",
+    "w1thermsensor>=2.3,<3",
+    "gpiozero>=2.0,<3",
+    "lgpio>=0.2,<0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.25,<0.26",
+    "httpx>=0.28,<0.29",
+    "ruff>=0.8,<0.9",
+    "mypy>=1.14,<2",
+]
+
+[tool.uv]
+# Hardware extra is Pi-only; default dev sync stays laptop-friendly.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["hal", "service", "scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "service/tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["hal", "service"]
+
+# Hardware libraries ship no type stubs — ignore only those, keep strict elsewhere.
+[[tool.mypy.overrides]]
+module = [
+    "board",
+    "busio",
+    "adafruit_ads1x15.*",
+    "w1thermsensor.*",
+    "gpiozero.*",
+    "lgpio.*",
+]
+ignore_missing_imports = true

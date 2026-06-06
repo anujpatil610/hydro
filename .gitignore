@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+
+# Runtime data (SQLite db, calibration)
+data/*
+!data/.gitkeep
+
+# Node / web build
+node_modules/
+web/dist/
+
+# Editor / tooling
+.claude/
+.vscode/
+.idea/
+.DS_Store

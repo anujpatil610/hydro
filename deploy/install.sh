@@ -98,6 +98,8 @@ mkdir -p "$HOME/.config/systemd/user"
 cp deploy/hydro.service "$HOME/.config/systemd/user/hydro.service"
 echo "remote unit file:"
 ls -l "$HOME/.config/systemd/user/hydro.service"
+# Enable linger so the --user service starts at boot without an active login session.
+loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now hydro
 systemctl --user list-unit-files | grep -E '^hydro.service\s' || true

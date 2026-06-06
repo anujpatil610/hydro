@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink-900 text-slate-200 font-sans antialiased;
+}
+
+/* Tabular figures so live numeric readings don't jitter as digits change. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

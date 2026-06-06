@@ -1,0 +1,16 @@
+[Unit]
+Description=Hydro Raspberry Pi hydroponics controller
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/hydro
+EnvironmentFile=%h/hydro/.env
+ExecStart=%h/hydro/.venv/bin/uvicorn service.main:app --host $HYDRO_HOST --port $HYDRO_PORT
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

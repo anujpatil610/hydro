@@ -32,3 +32,18 @@ Real-mode hardware drivers live in the optional `hardware` extra and install onl
 | `web/` | Vite + React dashboard |
 | `scripts/` | Calibration + hardware sanity helpers |
 | `deploy/` | systemd unit + install script |
+
+## Deploy
+
+After `web` is built, deploy the repo to the Pi and enable the user service:
+
+```sh
+./deploy/install.sh hydropi@172.20.6.122
+ssh hydropi@172.20.6.122 'systemctl --user status hydro'
+```
+
+For the wired Pi setup, pass `real` mode (remote path is `~/hydro` on the Pi):
+
+```sh
+./deploy/install.sh hydropi@172.20.6.122 hydro real
+```

@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-ENV_EXAMPLE = REPO_ROOT / "deploy" / ".env.example"
+ENV_EXAMPLE = REPO_ROOT / ".env.example"
 INSTALL_SH = REPO_ROOT / "deploy" / "install.sh"
 HYDRO_SERVICE = REPO_ROOT / "deploy" / "hydro.service"
 

@@ -1,0 +1,29 @@
+# Dev bench — byte-for-byte behavior parity with current Phase 1.
+# 3 sensors (pH @ A0, TDS @ A1, DS18B20) + 1 pump @ GPIO17, mock by default.
+# This is the default profile (HYDRO_PROFILE); the system behaves as Phase 1.
+profile:
+  id: bench-01
+  name: "Dev Bench"
+  tier: bench
+  mode_default: mock
+  retention_hours: 24
+  poll_seconds: 10
+
+crops:
+  lettuce:
+    bands:
+      ph:   { min: 5.5, max: 6.5 }
+      tds:  { min: 800, max: 1200 }
+      temp: { min: 18,  max: 24 }
+
+reservoirs:
+  - { id: resA, volume_l: 20, zone: zoneA }
+
+zones:
+  - { id: zoneA, crop: lettuce, reservoir: resA, racks: [] }
+
+devices:
+  - { id: ph_resA,   kind: ph,   driver: ads1115,    role: monitor,      reservoir: resA, binding: { i2c_addr: 0x48, channel: 0 } }
+  - { id: tds_resA,  kind: tds,  driver: ads1115,    role: monitor,      reservoir: resA, binding: { i2c_addr: 0x48, channel: 1 } }
+  - { id: temp_resA, kind: temp, driver: ds18b20,    role: monitor,      reservoir: resA, binding: {} }
+  - { id: pump_resA, kind: pump, driver: relay-gpio, role: dose-generic, reservoir: resA, binding: { gpio: 17 }, spec: { ml_per_min: 50 } }

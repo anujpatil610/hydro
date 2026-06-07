@@ -5,8 +5,8 @@ This folder contains the headless Pi deploy artifacts for Hydro.
 ## Files
 
 - `hydro.service` — systemd user unit for `hydropi`.
-- `install.sh` — local deploy script that syncs the repo, installs Python dependencies, and enables the service.
-- `.env.example` — runtime config template for `HYDRO_*` environment variables.
+- `install.sh` — local deploy script that syncs the repo, installs Python dependencies, and enables the service. It generates `.env` on the Pi from the `HYDRO_*` defaults (see `../.env.example` for the template).
+- `hardening.sh` / `cleanup.sh` — firewall + file-permission hardening and headless package cleanup.
 
 ## Usage
 

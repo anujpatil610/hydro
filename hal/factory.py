@@ -1,7 +1,16 @@
-"""build_hal() — assemble the sensor/actuator set for the active HYDRO_MODE.
+"""HAL factories.
 
-Real hardware imports are performed lazily inside the real branch so the whole
-package (and the test suite) imports cleanly on a laptop without the drivers.
+``build_device_set(profile)`` is the profile-driven factory: it walks
+``profile.devices``, resolves each ``(kind, driver, mode)`` against the driver
+registry, and returns a :class:`~hal.device_set.DeviceSet`. This is the path the
+service uses from Stage 4 onward.
+
+``build_hal(mode)`` is the legacy fixed-shape factory kept for backward
+compatibility (and its existing tests) until the service is migrated; it will
+be removed once nothing depends on it.
+
+Real hardware imports are performed lazily inside the real drivers / shared
+hardware so the whole package (and the test suite) imports cleanly on a laptop.
 """
 
 from __future__ import annotations
@@ -10,7 +19,39 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from service.profile.schema import ProfileFile, resolved_mode
+
 from hal.base import Pump, Sensor
+from hal.device_set import DeviceSet
+from hal.drivers.context import BuildContext, SharedHardware
+from hal.drivers.mock_state import ReservoirState
+from hal.registry import REGISTRY
+
+
+def build_device_set(
+    profile: ProfileFile, *, calibration_path: Path | None = None
+) -> DeviceSet:
+    """Construct every device the profile declares, keyed by id."""
+    import hal.drivers  # noqa: F401  (populate the registry on first use)
+
+    state = ReservoirState(profile)
+    shared = SharedHardware()
+    devices: dict[str, object] = {}
+    for dev in profile.devices:
+        mode = resolved_mode(dev, profile.profile)
+        ctx = BuildContext(
+            device_id=dev.id,
+            kind=dev.kind,
+            role=dev.role,
+            reservoir=dev.reservoir,
+            reservoir_state=state,
+            shared=shared,
+            calibration_path=calibration_path,
+        )
+        devices[dev.id] = REGISTRY.build(
+            dev.kind, dev.driver, mode, binding=dev.binding, spec=dev.spec, ctx=ctx
+        )
+    return DeviceSet(profile=profile, devices=devices, reservoir_state=state)
 
 
 @dataclass(slots=True)

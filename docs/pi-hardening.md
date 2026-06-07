@@ -36,7 +36,9 @@ Directives added to `deploy/hydro.service`:
 
 - Default policy: deny all incoming, allow all outgoing.
 - SSH (port 22) allowed from any source.
-- Port 8000 (dashboard) allowed only from the LAN subnet `172.20.6.0/24`.
+- Port 8000 (dashboard) allowed only from the LAN subnet (default `172.20.0.0/16`; override with `HYDRO_LAN_SUBNET`). The Pi is on `172.20.6.x` and clients on `172.20.7.x`, so a `/16` covers the whole LAN.
+
+Run as the hydro user (not via sudo): `./deploy/hardening.sh`. It chmods user-owned files and calls `ufw` through sudo.
 
 ## File permissions baseline
 

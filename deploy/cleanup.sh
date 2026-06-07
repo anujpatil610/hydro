@@ -29,9 +29,11 @@ echo "--- RealVNC server (remove before desktop packages) ---"
 # realvnc-vnc-server's postrm calls update-desktop-database from desktop-file-utils.
 # Removing it first avoids a broken-package state if desktop-file-utils is pulled out.
 if dpkg-query -W -f='${Status}' realvnc-vnc-server 2>/dev/null | grep -q "install ok installed"; then
-  sh -c 'echo "#!/bin/sh\nexit 0" > /var/lib/dpkg/info/realvnc-vnc-server.postrm'
+  # printf (not echo) so the newline is portable across shells, not reliant on
+  # dash's escape-interpreting echo.
+  printf '#!/bin/sh\nexit 0\n' > /var/lib/dpkg/info/realvnc-vnc-server.postrm
   chmod +x /var/lib/dpkg/info/realvnc-vnc-server.postrm
-  DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y realvnc-vnc-server || true
+  DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y realvnc-vnc-server
 fi
 
 echo "--- GUI / X11 / Wayland ---"
@@ -84,12 +86,17 @@ apt-get clean
 echo "--- Disable services not needed headless ---"
 for svc in wayvnc-control glamor-test accounts-daemon udisks2; do
   if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
-    systemctl disable --now "${svc}.service" 2>/dev/null || true
+    # Keep stderr visible: the list-unit-files guard means a disable failure here
+    # is a real problem worth seeing, not an expected "unit not found".
+    systemctl disable --now "${svc}.service" || echo "  WARN: failed to disable ${svc}" >&2
   fi
 done
 
-# Mask cloud-init: first-boot provisioning tool, not needed after setup.
-systemctl mask cloud-init cloud-config cloud-final cloud-init-local 2>/dev/null || true
+# Mask cloud-init: first-boot provisioning tool. Mask per-unit so a partial
+# failure (some units absent on this image) is visible rather than swallowed.
+for unit in cloud-init cloud-config cloud-final cloud-init-local; do
+  systemctl mask "$unit" || echo "  WARN: could not mask $unit" >&2
+done
 
 echo "--- Locale cleanup ---"
 if command -v localepurge >/dev/null 2>&1; then

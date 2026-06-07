@@ -85,6 +85,15 @@ HYDRO_RETENTION_HOURS=24
 HYDRO_PUMP_ML_PER_MIN=50.0
 HYDRO_CALIBRATION_PATH=data/calibration.json
 ENV_EOF
+else
+  # .env is preserved across re-deploys. Warn if its mode disagrees with the
+  # requested deploy mode, since the venv gets the new mode's deps either way.
+  existing_mode=$(grep -E '^HYDRO_MODE=' .env | cut -d= -f2)
+  if [ "$existing_mode" != "$MODE" ]; then
+    echo "WARNING: existing .env has HYDRO_MODE=$existing_mode but deploy requested $MODE." >&2
+    echo "         The service will keep running in '$existing_mode' mode." >&2
+    echo "         Edit .env and restart, or remove .env to regenerate." >&2
+  fi
 fi
 python3 -m venv .venv
 . .venv/bin/activate
@@ -103,5 +112,14 @@ loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now hydro
 systemctl --user list-unit-files | grep -E '^hydro.service\s' || true
+# Verify the service is actually running. 'enable --now' returns success once the
+# unit is started, but a service that starts then crashes (bad .env, missing
+# hardware lib in real mode, port in use) would otherwise report a green deploy.
+if ! systemctl --user is-active --quiet hydro; then
+  echo "ERROR: hydro failed to start or crashed after launch." >&2
+  systemctl --user status hydro --no-pager || true
+  journalctl --user -u hydro -n 50 --no-pager || true
+  exit 1
+fi
 systemctl --user status hydro --no-pager || true
 REMOTE_SCRIPT

@@ -36,5 +36,7 @@ This folder contains the headless Pi deploy artifacts for Hydro.
 ## Notes
 
 - The service uses `~/.config/systemd/user/hydro.service` for the Pi user.
-- `HYDRO_MODE` is controlled via `.env`.
+- `install.sh` enables linger (`loginctl enable-linger`) so the service starts at boot without a login session.
+- `HYDRO_MODE` is controlled via `.env`. `install.sh` preserves an existing `.env` across re-deploys (and warns if its mode differs from the requested mode).
+- Sync uses `rsync` when available, else falls back to `tar` over ssh. The tar fallback does **not** delete stale remote files — wipe `~/hydro` first for a clean redeploy.
 - The app serves the built `web/dist` directory from FastAPI when present.

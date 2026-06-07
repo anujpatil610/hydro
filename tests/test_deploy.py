@@ -5,8 +5,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).parent.parent
 ENV_EXAMPLE = REPO_ROOT / "deploy" / ".env.example"
 INSTALL_SH = REPO_ROOT / "deploy" / "install.sh"
@@ -24,15 +22,32 @@ REQUIRED_ENV_KEYS = {
 }
 
 
-def test_env_example_has_all_required_keys():
-    content = ENV_EXAMPLE.read_text()
+def _env_keys(path: Path) -> set[str]:
     keys = set()
-    for line in content.splitlines():
+    for line in path.read_text().splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             keys.add(line.split("=", 1)[0])
-    missing = REQUIRED_ENV_KEYS - keys
+    return keys
+
+
+def test_env_example_has_all_required_keys():
+    missing = REQUIRED_ENV_KEYS - _env_keys(ENV_EXAMPLE)
     assert not missing, f"Missing keys in .env.example: {missing}"
+
+
+def test_env_example_keys_match_settings_contract():
+    """Every key in .env.example must correspond to a real Settings field.
+
+    Catches drift: if a field is renamed/removed in service.config.Settings, a
+    stale HYDRO_* key in .env.example (which would be silently ignored at
+    runtime) fails here instead of producing a misconfigured Pi.
+    """
+    from service.config import Settings
+
+    valid = {f"HYDRO_{name.upper()}" for name in Settings.model_fields}
+    unknown = _env_keys(ENV_EXAMPLE) - valid
+    assert not unknown, f".env.example has keys with no matching Settings field: {unknown}"
 
 
 def test_install_sh_syntax():

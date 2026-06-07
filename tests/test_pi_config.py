@@ -58,10 +58,12 @@ def test_hardening_sh_syntax():
 
 def test_hardening_sh_sets_env_permissions():
     content = HARDENING_SH.read_text()
-    assert "chmod 600" in content
+    assert "chmod" in content
     lines = content.splitlines()
-    assert any("chmod 600" in line and ".env" in line for line in lines), (
-        "Expected a line containing both 'chmod 600' and '.env'"
+    # .env must be locked to owner-read-only (600), whether via a literal
+    # `chmod 600 .env` or a path:mode table entry like `.env:600`.
+    assert any(".env" in line and "600" in line for line in lines), (
+        "Expected .env to be assigned mode 600 in hardening.sh"
     )
 
 

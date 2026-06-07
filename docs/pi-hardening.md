@@ -56,7 +56,7 @@ installed before attempting removal so the script is safe to run multiple times)
 
 | Category | Packages removed | Disk freed (approx.) |
 |---|---|---|
-| GUI / X11 / Wayland | `xserver-xorg*`, `xwayland`, `lightdm*`, `openbox`, `pcmanfm`, `mousepad`, `xdg-desktop-portal*`, `rpd-wayland-*`, `x11-*`, `desktop-file-utils` | ~120 MB |
+| GUI / X11 / Wayland | `xserver-xorg*`, `xwayland`, `lightdm*`, `openbox`, `pcmanfm`, `mousepad`, `xdg-desktop-portal*`, `rpd-wayland-*`, `x11-*` | ~120 MB |
 | Audio / PipeWire | `pipewire`, `pipewire-bin`, `pipewire-pulse`, `sound-theme-freedesktop` | ~25 MB |
 | VLC | `vlc`, `vlc-bin`, `vlc-data`, `vlc-l10n`, `vlc-plugin-*` | ~90 MB |
 | Education / GUI tools | `thonny`, `galculator`, `python3-pygame` | ~40 MB |

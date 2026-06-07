@@ -33,15 +33,28 @@ sync_repo() {
       --exclude='.venv' \
       --exclude='__pycache__' \
       "./" "${REMOTE}:${REMOTE_DIR}/"
-  elif command -v scp >/dev/null 2>&1; then
-    echo "WARNING: rsync not found; falling back to scp. This may be slower."
+  elif command -v tar >/dev/null 2>&1; then
+    # tar over ssh honors excludes (scp -r does not, and would copy .git, whose
+    # read-only objects then fail to overwrite on re-deploy). No --delete, so
+    # stale remote files are not removed; wipe the remote dir for a clean slate.
+    echo "rsync not found; syncing via tar over ssh."
     case "$REMOTE_DIR" in
-      /*) ssh "$REMOTE" "mkdir -p \"$REMOTE_DIR\"" ;;
-      *) ssh "$REMOTE" "mkdir -p \"\$HOME/$REMOTE_DIR\"" ;;
+      /*) RD="$REMOTE_DIR" ;;
+      *) RD="\$HOME/$REMOTE_DIR" ;;
     esac
-    scp -r "./" "${REMOTE}:${REMOTE_DIR}/"
+    tar czf - \
+      --exclude='.git' \
+      --exclude='web/node_modules' \
+      --exclude='.venv' \
+      --exclude='__pycache__' \
+      --exclude='*.pyc' \
+      --exclude='hydro.egg-info' \
+      --exclude='data/*.db' \
+      --exclude='data/*.db-*' \
+      --exclude='.claude' \
+      "./" | ssh "$REMOTE" "mkdir -p $RD && tar xzf - -C $RD"
   else
-    echo "ERROR: neither rsync nor scp is available locally."
+    echo "ERROR: neither rsync nor tar is available locally."
     exit 1
   fi
 }
@@ -72,6 +85,15 @@ HYDRO_RETENTION_HOURS=24
 HYDRO_PUMP_ML_PER_MIN=50.0
 HYDRO_CALIBRATION_PATH=data/calibration.json
 ENV_EOF
+else
+  # .env is preserved across re-deploys. Warn if its mode disagrees with the
+  # requested deploy mode, since the venv gets the new mode's deps either way.
+  existing_mode=$(grep -E '^HYDRO_MODE=' .env | cut -d= -f2)
+  if [ "$existing_mode" != "$MODE" ]; then
+    echo "WARNING: existing .env has HYDRO_MODE=$existing_mode but deploy requested $MODE." >&2
+    echo "         The service will keep running in '$existing_mode' mode." >&2
+    echo "         Edit .env and restart, or remove .env to regenerate." >&2
+  fi
 fi
 python3 -m venv .venv
 . .venv/bin/activate
@@ -85,8 +107,19 @@ mkdir -p "$HOME/.config/systemd/user"
 cp deploy/hydro.service "$HOME/.config/systemd/user/hydro.service"
 echo "remote unit file:"
 ls -l "$HOME/.config/systemd/user/hydro.service"
+# Enable linger so the --user service starts at boot without an active login session.
+loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now hydro
 systemctl --user list-unit-files | grep -E '^hydro.service\s' || true
+# Verify the service is actually running. 'enable --now' returns success once the
+# unit is started, but a service that starts then crashes (bad .env, missing
+# hardware lib in real mode, port in use) would otherwise report a green deploy.
+if ! systemctl --user is-active --quiet hydro; then
+  echo "ERROR: hydro failed to start or crashed after launch." >&2
+  systemctl --user status hydro --no-pager || true
+  journalctl --user -u hydro -n 50 --no-pager || true
+  exit 1
+fi
 systemctl --user status hydro --no-pager || true
 REMOTE_SCRIPT

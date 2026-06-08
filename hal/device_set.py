@@ -56,6 +56,15 @@ class DeviceSet:
     def sensors(self) -> list[Sensor]:
         return [obj for obj in self._in_profile_order() if isinstance(obj, Sensor)]
 
+    def sensor_items(self) -> list[tuple[Device, Sensor]]:
+        """(profile device, constructed sensor) pairs, in profile order."""
+        out: list[tuple[Device, Sensor]] = []
+        for d in self.profile.devices:
+            obj = self.devices[d.id]
+            if isinstance(obj, Sensor):
+                out.append((d, obj))
+        return out
+
     def actuators(self) -> list[object]:
         return [obj for obj in self._in_profile_order() if not isinstance(obj, Sensor)]
 

@@ -10,12 +10,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from hal.factory import build_hal
+from hal.factory import build_device_set
 
-from service.api import actuators, health, sensors
+from service.api import actuators, health, sensors, topology
 from service.config import Settings
 from service.db.session import init_db, make_engine
 from service.poller import Poller
+from service.profile.loader import load_profile
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
@@ -25,17 +26,18 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        profile = load_profile(settings.profile)
+        meta = profile.profile
         engine = make_engine(settings.db_path)
         init_db(engine)
-        hal = build_hal(
-            settings.mode,
-            ml_per_min=settings.pump_ml_per_min,
-            calibration_path=Path(settings.calibration_path),
+        device_set = build_device_set(
+            profile, calibration_path=Path(settings.calibration_path)
         )
-        poller = Poller(hal, engine, settings.poll_seconds, settings.retention_hours)
+        poller = Poller(device_set, engine, meta.poll_seconds, meta.retention_hours)
         app.state.settings = settings
+        app.state.profile = profile
         app.state.engine = engine
-        app.state.hal = hal
+        app.state.device_set = device_set
         app.state.poller = poller
         app.state.started_at = time.monotonic()
         if start_poller:
@@ -55,6 +57,7 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
         allow_headers=["*"],
     )
     app.include_router(health.router)
+    app.include_router(topology.router)
     app.include_router(sensors.router)
     app.include_router(actuators.router)
 

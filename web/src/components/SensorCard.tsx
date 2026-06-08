@@ -1,22 +1,28 @@
-import type { MetricMeta } from "../lib/metrics";
-import type { Reading } from "../lib/schema";
+import { kindMeta } from "../lib/kinds";
+import type { Band, Device, Reading } from "../lib/schema";
 
 interface Props {
-  meta: MetricMeta;
+  device: Device;
   reading: Reading | undefined;
+  band: Band | undefined;
 }
 
-export function SensorCard({ meta, reading }: Props) {
+export function SensorCard({ device, reading, band }: Props) {
+  const meta = kindMeta(device.kind);
   const value = reading?.value;
-  const inBand = value !== undefined && value >= meta.min && value <= meta.max;
-  const healthy = inBand && (reading?.ok ?? false);
+  const inBand =
+    value !== undefined && band !== undefined && value >= band.min && value <= band.max;
+  // With no declared band we can't judge range, so trust the reading's ok flag.
+  const healthy = (reading?.ok ?? false) && (band === undefined || inBand);
 
-  // Gauge fill: position of the value across (a padded view of) the healthy band.
-  const span = meta.max - meta.min;
-  const lo = meta.min - span * 0.5;
-  const hi = meta.max + span * 0.5;
+  // Gauge fill: position of the value across a padded view of the healthy band.
+  const span = band ? band.max - band.min : 1;
+  const lo = band ? band.min - span * 0.5 : 0;
+  const hi = band ? band.max + span * 0.5 : 1;
   const pct =
-    value === undefined ? 0 : Math.min(100, Math.max(0, ((value - lo) / (hi - lo)) * 100));
+    value === undefined || band === undefined
+      ? 0
+      : Math.min(100, Math.max(0, ((value - lo) / (hi - lo)) * 100));
 
   const accent = healthy ? "text-leaf" : "text-amber-400";
   const bar = healthy ? "bg-leaf" : "bg-amber-400";
@@ -27,16 +33,14 @@ export function SensorCard({ meta, reading }: Props) {
         <span className="text-sm font-medium uppercase tracking-wide text-slate-400">
           {meta.label}
         </span>
-        <span className="text-xs text-slate-500">
-          {meta.min}&ndash;{meta.max}
-        </span>
+        <span className="text-xs text-slate-500">{band ? `${band.min}–${band.max}` : ""}</span>
       </div>
 
       <div className="mt-3 flex items-baseline gap-2">
         <span className={`tnum text-4xl font-semibold ${accent}`}>
           {value === undefined ? "--" : value.toFixed(meta.decimals)}
         </span>
-        <span className="text-base text-slate-400">{reading?.unit ?? ""}</span>
+        <span className="text-base text-slate-400">{device.unit || reading?.unit || ""}</span>
       </div>
 
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-ink-700">
@@ -46,7 +50,7 @@ export function SensorCard({ meta, reading }: Props) {
       <div className="mt-2 h-4 text-xs text-amber-400">
         {reading && !reading.ok
           ? reading.note
-          : !inBand && value !== undefined
+          : !inBand && value !== undefined && band !== undefined
             ? "out of range"
             : ""}
       </div>

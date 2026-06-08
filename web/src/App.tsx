@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HistoryChart } from "./components/HistoryChart";
-import { PumpControl } from "./components/PumpControl";
-import { SensorCard } from "./components/SensorCard";
+import { ZoneSection } from "./components/ZoneSection";
 import { api } from "./lib/api";
-import { METRICS } from "./lib/metrics";
-import type { Health, Reading } from "./lib/schema";
+import type { Health, Reading, Topology } from "./lib/schema";
+import { buildLayout } from "./lib/topology";
 
 function useInterval(fn: () => void, ms: number) {
   const saved = useRef(fn);
@@ -20,10 +19,19 @@ function useInterval(fn: () => void, ms: number) {
 }
 
 export default function App() {
+  const [topology, setTopology] = useState<Topology | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [latest, setLatest] = useState<Reading[]>([]);
   const [history, setHistory] = useState<Reading[]>([]);
   const [offline, setOffline] = useState(false);
+
+  // Topology is resolved once at boot (it changes only on a service restart).
+  useEffect(() => {
+    api
+      .topology()
+      .then(setTopology)
+      .catch(() => setOffline(true));
+  }, []);
 
   useInterval(() => {
     Promise.all([api.health(), api.latest()])
@@ -42,19 +50,26 @@ export default function App() {
       .catch(() => setOffline(true));
   }, 30000);
 
-  const byMetric = (m: string) => latest.find((r) => r.metric === m);
+  const views = useMemo(() => (topology ? buildLayout(topology) : []), [topology]);
+  const sensorDevices = useMemo(() => views.flatMap((v) => v.sensors), [views]);
+  const readingByDevice = useMemo(() => {
+    const map = new Map(latest.map((r) => [r.device_id, r]));
+    return (deviceId: string) => map.get(deviceId);
+  }, [latest]);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-6 py-8">
       <header className="mb-8 flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold text-leaf">Hydro</h1>
-          <span className="text-sm text-slate-500">hydroponics controller</span>
+          <span className="text-sm text-slate-500">
+            {topology ? topology.profile.name : "hydroponics controller"}
+          </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           {health && (
             <span className="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-slate-300">
-              mode: <span className="text-blueprint">{health.mode}</span>
+              {health.tier} · mode: <span className="text-blueprint">{health.mode}</span>
             </span>
           )}
           <span
@@ -67,18 +82,14 @@ export default function App() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {METRICS.map((m) => (
-          <SensorCard key={m.key} meta={m} reading={byMetric(m.key)} />
+      <div className="space-y-6">
+        {views.map((v) => (
+          <ZoneSection key={v.zone.id} view={v} readingByDevice={readingByDevice} />
         ))}
-      </section>
+      </div>
 
       <section className="mt-6">
-        <HistoryChart history={history} />
-      </section>
-
-      <section className="mt-6">
-        <PumpControl />
+        <HistoryChart devices={sensorDevices} history={history} />
       </section>
     </div>
   );

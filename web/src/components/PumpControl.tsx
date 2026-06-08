@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { api } from "../lib/api";
+import type { Device } from "../lib/schema";
 
-export function PumpControl() {
+interface Props {
+  device: Device;
+}
+
+export function PumpControl({ device }: Props) {
   const [ml, setMl] = useState(5);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -12,7 +17,7 @@ export function PumpControl() {
     setStatus(null);
     setError(null);
     try {
-      const res = await api.pumpDoseMl(ml);
+      const res = await api.pumpDoseMl(device.id, ml);
       setStatus(`Dosed ${res.estimated_ml} mL (${res.ran_for_ms} ms)`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "pump failed");
@@ -23,9 +28,10 @@ export function PumpControl() {
 
   return (
     <div className="rounded-xl border border-ink-700 bg-ink-800 p-5 shadow-lg">
-      <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-slate-400">
-        Manual Dose
-      </h2>
+      <div className="mb-4 flex items-baseline justify-between">
+        <h3 className="text-sm font-medium uppercase tracking-wide text-slate-400">{device.id}</h3>
+        <span className="text-xs text-slate-500">{device.role}</span>
+      </div>
 
       <div className="flex items-end gap-3">
         <label className="flex flex-col text-xs text-slate-400">

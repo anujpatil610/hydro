@@ -40,6 +40,11 @@ class Poller:
         profile = self._ds.profile
         items = self._ds.sensor_items()
 
+        # Sim mode: advance the closed-loop World one interval before reading so
+        # a live HYDRO_MODE=sim service grows in real time (no-op otherwise).
+        if self._ds.world is not None:
+            self._ds.world.step()
+
         # Read temperatures first so TDS sensors can compensate against their
         # reservoir's water temp (real mode); mock ignores this harmlessly.
         readings: dict[str, HalReading] = {}

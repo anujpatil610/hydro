@@ -70,4 +70,4 @@ class BuildContext:
     reservoir_state: ReservoirState
     shared: SharedHardware
     calibration_path: Path | None = None
-    world: "World | None" = None  # set when any device resolves to sim mode
+    world: World | None = None  # set when any device resolves to sim mode

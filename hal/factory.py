@@ -57,7 +57,7 @@ def build_device_set(
         devices[dev.id] = REGISTRY.build(
             dev.kind, dev.driver, mode, binding=dev.binding, spec=dev.spec, ctx=ctx
         )
-    return DeviceSet(profile=profile, devices=devices, reservoir_state=state)
+    return DeviceSet(profile=profile, devices=devices, reservoir_state=state, world=world)
 
 
 @dataclass(slots=True)

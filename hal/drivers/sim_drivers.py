@@ -5,11 +5,12 @@ build share reproducible streams."""
 
 from __future__ import annotations
 
+from service.profile.schema import Binding, Spec
+
 from hal.drivers.context import BuildContext
 from hal.registry import REGISTRY
 from hal.sim.drivers import SimPump, SimSensor
 from hal.sim.noise import NoiseModel
-from service.profile.schema import Binding, Spec
 
 _UNIT = {"ph": "pH", "ec": "dS/m", "temp": "C", "tds": "ppm"}
 _noise_cache: dict[int, NoiseModel] = {}

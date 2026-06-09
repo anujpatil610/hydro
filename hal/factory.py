@@ -36,6 +36,11 @@ def build_device_set(
 
     state = ReservoirState(profile)
     shared = SharedHardware()
+    world = None
+    if any(resolved_mode(d, profile.profile) == "sim" for d in profile.devices):
+        from hal.sim.build import build_world
+
+        world = build_world(profile)
     devices: dict[str, object] = {}
     for dev in profile.devices:
         mode = resolved_mode(dev, profile.profile)
@@ -47,6 +52,7 @@ def build_device_set(
             reservoir_state=state,
             shared=shared,
             calibration_path=calibration_path,
+            world=world,
         )
         devices[dev.id] = REGISTRY.build(
             dev.kind, dev.driver, mode, binding=dev.binding, spec=dev.spec, ctx=ctx

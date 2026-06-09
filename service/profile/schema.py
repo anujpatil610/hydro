@@ -36,7 +36,7 @@ SENSOR_KINDS = frozenset({"ph", "tds", "ec", "temp", "rh", "level", "co2", "par"
 ACTUATOR_KINDS = frozenset({"pump", "light", "fan", "valve"})
 ALL_KINDS = SENSOR_KINDS | ACTUATOR_KINDS
 
-Mode = Literal["mock", "real"]
+Mode = Literal["mock", "real", "sim"]
 Tier = Literal["bench", "pilot", "small", "commercial"]
 
 

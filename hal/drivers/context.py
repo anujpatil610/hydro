@@ -14,9 +14,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hal.drivers.mock_state import ReservoirState
+
+if TYPE_CHECKING:
+    from hal.sim.world import World
 
 
 @dataclass(slots=True)
@@ -67,3 +70,4 @@ class BuildContext:
     reservoir_state: ReservoirState
     shared: SharedHardware
     calibration_path: Path | None = None
+    world: "World | None" = None  # set when any device resolves to sim mode

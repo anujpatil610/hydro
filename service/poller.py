@@ -18,7 +18,7 @@ from hal.device_set import DeviceSet
 from sqlalchemy import Engine
 from sqlmodel import Session
 
-from service.db.models import Reading
+from service.db.models import Reading, TwinSample, naive_utc
 from service.db.session import prune_old
 from service.profile.loader import zone_of
 
@@ -73,12 +73,41 @@ class Poller:
             for dev, _ in items
             if dev.id in readings
         ]
+        twin_rows = self._twin_rows()
         with Session(self._engine) as session:
             session.add_all(rows)
+            session.add_all(twin_rows)
             session.commit()
             prune_old(session, self._retention_hours)
             session.commit()
         return rows
+
+    def _twin_rows(self) -> list[TwinSample]:
+        """Sim mode: one ground-truth TwinSample per reservoir (empty otherwise)."""
+        if self._ds.world is None:
+            return []
+        from hal.drivers.sim_drivers import noise_for_world
+
+        world = self._ds.world
+        noise = noise_for_world(world)
+        faults = ",".join(noise.active_faults(world.clock.sim_time_s)) if noise else ""
+        now = naive_utc()
+        twin_rows: list[TwinSample] = []
+        for rid in world.units:
+            snap = world.snapshot(rid)
+            vol = float(snap["volume_l"]) or 1.0
+            twin_rows.append(TwinSample(
+                timestamp=now, reservoir_id=rid,
+                stage=str(snap["stage"]),
+                biomass_g=float(snap["biomass_g"]), health=float(snap["health"]),
+                ph_true=float(snap["ph_true"]), ec_true=float(snap["ec_true"]),
+                temp_true=float(snap["temp_true"]), volume_l=float(snap["volume_l"]),
+                n_mg_l=float(snap["n_mass_mg"]) / vol,
+                p_mg_l=float(snap["p_mass_mg"]) / vol,
+                k_mg_l=float(snap["k_mass_mg"]) / vol,
+                faults=faults,
+            ))
+        return twin_rows
 
     def _read(self, sensor: Sensor, device_id: str) -> HalReading | None:
         """Read one sensor; a raising sensor is logged and skipped (Risk 5)."""

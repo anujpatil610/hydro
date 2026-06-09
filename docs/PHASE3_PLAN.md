@@ -1,6 +1,6 @@
 # Hydro — Phase 3 Implementation Plan: Rules Engine / Auto-Dosing
 
-Status: **DRAFT — revision of the approved control plan, re-anchored on the Phase-2 profile architecture.** Supersedes the earlier "Phase 2 control" draft, which was written against the Phase-1 tree. The §7 control decisions from that draft remain locked; everything structural is rebased onto profiles. Build begins at P3-S2 under the one-branch-per-stage discipline (stop for review at each stage summary).
+Status: **READY FOR REVIEW — control decisions locked (§8), defaults research-backed (`PHASE3_RESEARCH.md`), operator/safety guide in `control.md`.** Revision of the approved control plan, re-anchored on the Phase-2 profile architecture. Supersedes the earlier "Phase 2 control" draft, which was written against the Phase-1 tree. The §7 control decisions from that draft remain locked; everything structural is rebased onto profiles. Build begins at P3-S2 under the one-branch-per-stage discipline (stop for review at each stage summary).
 
 **Phase 3 goal:** turn the monitor into a *controller*. Add a profile-driven **rules engine (Layer IV)** that automatically doses to keep each reservoir's pH (and optionally EC/TDS) inside its crop band — with hard safety interlocks, an auditable dose ledger, an E-STOP, and fail-safe boot behavior. Manual dosing remains, now routed through the same safety + logging path.
 
@@ -41,14 +41,14 @@ control:
       kind: ph                  # must have a crop band for this reservoir's zone
       mode_default: monitor     # off | monitor | auto (post-arm ceiling, see fail-safe boot)
       direction: down           # which correction is actuated; resolved to role dose-ph-down
-      deadband: 0.15            # half-width around band edge before acting
-      dose_ml: 2.0
-      settle_seconds: 180       # ignore reads after a dose (mixing)
-      cooldown_seconds: 600
-      max_doses_per_hour: 4
-      max_ml_per_day: 50
+      deadband: 0.2             # >= 2x probe accuracy (+-0.1 pH) so noise never doses
+      dose_ml: 1.0              # ~1.2 s at 50 mL/min; sized to <=0.1 pH per 3 doses (20 L)
+      settle_seconds: 300       # ignore reads after a dose (mixing)
+      cooldown_seconds: 900     # small-tank guidance: start long, shorten only if no overshoot
+      max_doses_per_hour: 3
+      max_ml_per_day: 20        # = 1 mL/L for the 20 L bench reservoir
       hard_limits: { min: 4.5, max: 8.5 }   # absolute refuse-to-dose bounds, never bypassable
-      watchdog_doses: 3         # no measurable improvement after N doses -> FAULT
+      watchdog_doses: 3         # 3 ineffective doses -> FAULT (bounds runaway at 3 mL)
     - reservoir: resA
       kind: ec
       mode_default: monitor     # monitor-only this phase (no actuation params required)
@@ -65,6 +65,24 @@ Validation (extends `ProfileFile._check_integrity`, raises `ProfileError`):
 - `require_level_ok` with no level device on a dosed reservoir requires `volume_budget_ml`.
 
 The target band is the **crop band** — control adds behavior, never a second copy of the numbers.
+
+### 1.1 Research-derived defaults (no placeholder N's)
+
+Derived in `docs/PHASE3_RESEARCH.md` (cited) for the 20 L bench reservoir with
+a 50 mL/min pump and the DFRobot Gravity pH V2 probe; larger reservoirs scale
+`dose_ml`/`max_ml_per_day` roughly with `volume_l`.
+
+| Tunable | Default | Reasoning (research §) |
+|---|---|---|
+| `dose_ml` | 1.0 | 0.25–0.5 mL/10 L guideline; Bluelab rule "≤0.1 pH per 3 dose cycles" (§1) |
+| `settle_seconds` | 300 | probe sees the unmixed plume until circulation completes (§2) |
+| `cooldown_seconds` | 900 | Bluelab Off-Time "start long"; 10-min floor, 15–20 min for small tanks (§2) |
+| `max_doses_per_hour` | 3 | consistent with 15-min cooldown; bounds hourly addition to 3 mL (§5) |
+| `max_ml_per_day` | 20 | 1 mL/L cap — bounds daily acid and added phosphorus (§1, §5) |
+| `deadband` | 0.2 pH | ≥ 2× probe accuracy (±0.1 pH) so noise alone never doses (§3) |
+| `watchdog_doses` | 3 | bounds a no-effect runaway at 3 mL (Bluelab uses 15 cycles) (§3) |
+| `hard_limits` | pH 4.5–8.5 | beyond this = broken probe or emergency; FAULT, never dose (§4) |
+| calibration freshness | 30 days | DFRobot recommends ~monthly recalibration (§4) |
 
 ## 2 · Directory tree (new / changed only)
 

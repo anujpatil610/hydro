@@ -13,7 +13,8 @@ bench to a multi-zone farm; only the profile changes.
 │ 5 · UI            Vite + React + TS + Tailwind + Recharts   │
 │                   rendered dynamically from GET /topology   │
 ├─────────────────────────────────────────────────────────────┤
-│ 4 · Rules engine  Phase 2 stub only (no automation)         │
+│ 4 · Rules engine  control/ — profile-driven dosing loops    │
+│                   (Phase 3, in build; design locked)        │
 ├─────────────────────────────────────────────────────────────┤
 │ 3 · Service       FastAPI + SQLite (SQLModel)               │
 │                   poller iterates DeviceSet.sensors(),      │
@@ -60,6 +61,31 @@ N-device system driven by data:
 Topology is **resolved once at boot**; changing a profile requires a service
 restart (cheap under systemd `Restart=`).
 
+### Layer 4 — rules engine (Phase 3)
+
+Design locked in `PHASE3_PLAN.md` (defaults derived in `PHASE3_RESEARCH.md`;
+operator guide in `control.md`); implementation lands in stages P3-S2…S7.
+
+One control loop per `(reservoir_id, kind)` declared in the profile's
+`control:` section. Bounded bang-bang (fixed dose + cooldown + caps), no PID.
+Actuators are resolved by role (`dose-ph-down`) through the `DeviceSet`; all
+actuation — auto and manual — passes through a single `ActuationService`
+(interlocks + dose ledger), the only code path that touches a pump.
+
+```
+poller tick (every poll_seconds)
+   └─> engine.tick(snapshot of latest readings)
+          └─> per-loop controller (IDLE→EVALUATING→DOSING→SETTLING, +HOLD/FAULT)
+                 └─> interlocks (median/staleness, calibration age, cooldown,
+                     caps, level gate, direction, hard limits, E-STOP)
+                     — ANY veto ⇒ no dose, HOLD + alert
+                        └─> ActuationService → pump dose → DoseEvent ledger
+```
+
+Fail-safe: loops boot to `monitor`; `auto` requires explicit operator arm;
+E-STOP persists across restarts; a watchdog FAULTs any loop whose doses have
+no effect.
+
 ### Data flow
 
 ```
@@ -91,7 +117,7 @@ Systemd user unit (`deploy/hydro.service`) running uvicorn; config via `.env`
 `profiles/bench.yaml`, which reproduces the Phase-1 bench rig). See
 `deploy/README.md` and `docs/profile-authoring.md`.
 
-## Phase 3+ non-goals (explicitly out of scope now)
+## Later-phase non-goals (explicitly out of scope now)
 
 Recorded so they are not accidentally designed-in early:
 
@@ -99,7 +125,8 @@ Recorded so they are not accidentally designed-in early:
 - Cloud connectivity / remote fleet management
 - Multi-tenant support
 - Authentication / authorization
-- Rules engine (auto-dosing) — remains a stub
+- PID/proportional dosing, EC/nutrient auto-dosing, pH-up chemistry — the
+  Phase-3 rules engine is pH-down bang-bang only
 - Aquaponics (fish-loop) support
 - Solar / power management
 - GS1 / traceability standards

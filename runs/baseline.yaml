@@ -1,0 +1,10 @@
+# Example batch: 3 seeds x 2 scenarios = 6 grows of hydroponic lettuce.
+name: baseline
+base:
+  profile: profiles/bench-sim.yaml
+  duration_days: 35
+  sample_interval_s: 600
+seeds: [1, 2, 3]
+scenarios: [clean, clogged_pump_midgrow]
+random_density: 3.0
+emit_csv: false

@@ -120,7 +120,10 @@ ls -l "$HOME/.config/systemd/user/hydro.service"
 # Enable linger so the --user service starts at boot without an active login session.
 loginctl enable-linger "$USER"
 systemctl --user daemon-reload
-systemctl --user enable --now hydro
+systemctl --user enable hydro
+# 'enable --now' is a no-op on an already-running unit, leaving the old code
+# serving after a redeploy. Restart (= start when stopped) picks up the sync.
+systemctl --user restart hydro
 systemctl --user list-unit-files | grep -E '^hydro.service\s' || true
 # Verify the service is actually running. 'enable --now' returns success once the
 # unit is started, but a service that starts then crashes (bad .env, missing

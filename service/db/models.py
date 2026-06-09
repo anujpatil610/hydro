@@ -60,6 +60,41 @@ class Reading(SQLModel, table=True):
         )
 
 
+class TwinSample(SQLModel, table=True):
+    """Sim-only ground-truth track, one row per reservoir per poll tick."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(index=True)
+    reservoir_id: str = Field(index=True)
+    stage: str
+    biomass_g: float
+    health: float
+    ph_true: float
+    ec_true: float
+    temp_true: float
+    volume_l: float
+    n_mg_l: float
+    p_mg_l: float
+    k_mg_l: float
+    faults: str = ""  # comma-joined "kind:metric" markers active at sample time
+
+
+class TwinSampleOut(BaseModel):
+    timestamp: datetime
+    reservoir_id: str
+    stage: str
+    biomass_g: float
+    health: float
+    ph_true: float
+    ec_true: float
+    temp_true: float
+    volume_l: float
+    n_mg_l: float
+    p_mg_l: float
+    k_mg_l: float
+    faults: str
+
+
 class ReadingOut(BaseModel):
     device_id: str | None = None
     kind: str | None = None

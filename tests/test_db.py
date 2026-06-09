@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from service.db.models import Reading, naive_utc
+from service.db.models import Reading, TwinSample, naive_utc
 from service.db.session import (
     history,
     init_db,
     latest_per_device,
     make_engine,
     migrate_schema,
+    prune_old,
+    twin_history,
 )
 from sqlalchemy import Engine, text
 from sqlmodel import Session, select
@@ -116,3 +118,36 @@ def test_migrate_is_idempotent(tmp_path) -> None:
     engine = _engine(tmp_path)  # already current schema
     migrate_schema(engine)  # must not raise
     migrate_schema(engine)
+
+
+def _twin_row(ts, res: str = "res-a", biomass: float = 1.0) -> TwinSample:
+    return TwinSample(
+        timestamp=ts, reservoir_id=res, stage="vegetative", biomass_g=biomass,
+        health=0.95, ph_true=5.8, ec_true=1.4, temp_true=21.0, volume_l=49.0,
+        n_mg_l=80.0, p_mg_l=18.0, k_mg_l=70.0, faults="",
+    )
+
+
+def test_twin_history_filters_by_hours_and_reservoir(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    now = naive_utc()
+    with Session(engine) as s:
+        s.add(_twin_row(now - timedelta(hours=30)))  # too old
+        s.add(_twin_row(now - timedelta(hours=1)))   # kept
+        s.add(_twin_row(now, res="res-b"))           # other reservoir
+        s.commit()
+        rows = twin_history(s, hours=24, reservoir_id="res-a")
+    assert len(rows) == 1
+    assert rows[0].reservoir_id == "res-a"
+
+
+def test_prune_old_also_prunes_twin_samples(tmp_path) -> None:
+    engine = _engine(tmp_path)
+    now = naive_utc()
+    with Session(engine) as s:
+        s.add(_twin_row(now - timedelta(hours=30)))
+        s.add(_twin_row(now))
+        s.commit()
+        prune_old(s, retention_hours=24)
+        s.commit()
+        assert len(twin_history(s, hours=999)) == 1

@@ -39,3 +39,21 @@ def test_clogged_pump_delivers_less():
                    world=w, noise=noise, ml_per_min=50.0)
     pump.dose_ml(50.0)
     assert w.units["r1"].reservoir.n_mass_mg == before  # fully clogged -> no delivery
+
+
+def test_noise_for_world_returns_shared_model():
+    from hal.drivers.sim_drivers import noise_for_world
+    from hal.factory import build_device_set
+    from service.profile.loader import load_profile
+
+    ds = build_device_set(load_profile("profiles/bench-sim.yaml"))
+    nm = noise_for_world(ds.world)
+    assert nm is not None
+    sensor = next(s for s in ds.sensors() if hasattr(s, "noise"))
+    assert nm is sensor.noise
+
+
+def test_noise_for_world_unknown_world_is_none():
+    from hal.drivers.sim_drivers import noise_for_world
+
+    assert noise_for_world(object()) is None

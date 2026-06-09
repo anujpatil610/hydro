@@ -26,6 +26,11 @@ def _noise_for(ctx: BuildContext) -> NoiseModel:
     return nm
 
 
+def noise_for_world(world: object) -> NoiseModel | None:
+    """The shared NoiseModel for a built World (None if never built)."""
+    return _noise_cache.get(id(world))
+
+
 def _sensor_builder(kind: str):
     def build(*, binding: Binding, spec: Spec, ctx: BuildContext) -> SimSensor:
         assert ctx.world is not None and ctx.reservoir is not None

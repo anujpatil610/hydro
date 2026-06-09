@@ -13,7 +13,8 @@ bench to a multi-zone farm; only the profile changes.
 │ 5 · UI            Vite + React + TS + Tailwind + Recharts   │
 │                   rendered dynamically from GET /topology   │
 ├─────────────────────────────────────────────────────────────┤
-│ 4 · Rules engine  Phase 2 stub only (no automation)         │
+│ 4 · Rules engine  control/ — profile-driven dosing loops    │
+│                   (Phase 3, in build; design locked)        │
 ├─────────────────────────────────────────────────────────────┤
 │ 3 · Service       FastAPI + SQLite (SQLModel)               │
 │                   poller iterates DeviceSet.sensors(),      │
@@ -24,7 +25,7 @@ bench to a multi-zone farm; only the profile changes.
 │     registry      hal/device_set.py, hal/drivers/*          │
 ├─────────────────────────────────────────────────────────────┤
 │ 2 · HAL           Sensor / Pump ABCs, Reading, conversions; │
-│                   mock + real implementations               │
+│                   mock + real + sim implementations         │
 ├─────────────────────────────────────────────────────────────┤
 │ 1 · OS            Raspberry Pi OS, I2C + 1-Wire, systemd    │
 └─────────────────────────────────────────────────────────────┘
@@ -60,6 +61,47 @@ N-device system driven by data:
 Topology is **resolved once at boot**; changing a profile requires a service
 restart (cheap under systemd `Restart=`).
 
+### Layer 2 — `sim` mode: mechanistic digital twin
+
+A third HAL mode, `HYDRO_MODE=sim` (driver `sim`), backs the sensors with a
+mechanistic closed-loop simulation instead of mock oscillation or real hardware.
+A single `World` (`hal/sim/world.py`) owns per-reservoir plant + reservoir + zone
+state and integrates the coupled growth/uptake/water ODEs with SciPy `solve_ivp`
+(LSODA); sim sensors read observed (noisy) values from it and sim pumps dose back
+into it, closing the control loop. Crop agronomy lives in `crops/<name>.yaml`
+(growth, Barber-Cushman NPK uptake, optimal bands); a stochastic layer
+(`hal/sim/noise.py`) adds seeded sensor noise and injectable faults. The service,
+poller, DB, and API are unchanged — they cannot tell `sim` from `real`. Used both
+as a live control testbed (`speed=1`) and, later, a synthetic-data factory.
+Design + research: `docs/superpowers/specs/2026-06-09-digital-twin-grow-sim-design.md`.
+Run it with `HYDRO_PROFILE=profiles/bench-sim.yaml`.
+
+### Layer 4 — rules engine (Phase 3)
+
+Design locked in `PHASE3_PLAN.md` (defaults derived in `PHASE3_RESEARCH.md`;
+operator guide in `control.md`); implementation lands in stages P3-S2…S8 (S6 adds API-key auth + firewall
+hardening before the control UI ships).
+
+One control loop per `(reservoir_id, kind)` declared in the profile's
+`control:` section. Bounded bang-bang (fixed dose + cooldown + caps), no PID.
+Actuators are resolved by role (`dose-ph-down`) through the `DeviceSet`; all
+actuation — auto and manual — passes through a single `ActuationService`
+(interlocks + dose ledger), the only code path that touches a pump.
+
+```
+poller tick (every poll_seconds)
+   └─> engine.tick(snapshot of latest readings)
+          └─> per-loop controller (IDLE→EVALUATING→DOSING→SETTLING, +HOLD/FAULT)
+                 └─> interlocks (median/staleness, calibration age, cooldown,
+                     caps, level gate, direction, hard limits, E-STOP)
+                     — ANY veto ⇒ no dose, HOLD + alert
+                        └─> ActuationService → pump dose → DoseEvent ledger
+```
+
+Fail-safe: loops boot to `monitor`; `auto` requires explicit operator arm;
+E-STOP persists across restarts; a watchdog FAULTs any loop whose doses have
+no effect.
+
 ### Data flow
 
 ```
@@ -91,15 +133,17 @@ Systemd user unit (`deploy/hydro.service`) running uvicorn; config via `.env`
 `profiles/bench.yaml`, which reproduces the Phase-1 bench rig). See
 `deploy/README.md` and `docs/profile-authoring.md`.
 
-## Phase 3+ non-goals (explicitly out of scope now)
+## Later-phase non-goals (explicitly out of scope now)
 
 Recorded so they are not accidentally designed-in early:
 
 - MQTT / Eclipse Ditto or any message-bus integration
 - Cloud connectivity / remote fleet management
 - Multi-tenant support
-- Authentication / authorization
-- Rules engine (auto-dosing) — remains a stub
+- Full authentication / authorization (users, roles, HTTPS) — Phase 3 P3-S6
+  ships a single Bearer API key on mutating routes + firewall/ssh hardening
+- PID/proportional dosing, EC/nutrient auto-dosing, pH-up chemistry — the
+  Phase-3 rules engine is pH-down bang-bang only
 - Aquaponics (fish-loop) support
 - Solar / power management
 - GS1 / traceability standards

@@ -1,0 +1,31 @@
+# Hydroponic lettuce agronomy parameters for the digital twin.
+# Sources & caveats: docs/superpowers/specs/2026-06-09-digital-twin-grow-sim-design.md
+# (Cornell CEA Handbook, UF/IFAS HS1422, van Henten, Barber-Cushman).
+# All values are literature-default placeholders — RECALIBRATE against real data.
+name: lettuce
+
+# Cornell 35-day staged schedule (11d germ+seedling, transplant d11, harvest d35).
+stages:
+  - {name: germination, days: 5}
+  - {name: seedling, days: 6}
+  - {name: vegetative, days: 14}
+  - {name: mature, days: 10}
+
+r_growth: 0.18          # RECALIBRATE  per-day logistic-equivalent growth coeff
+biomass_max_g: 5.0      # ~150 g fresh head ~ 5 g dry
+resp_coeff: 0.03        # RECALIBRATE  maintenance respiration fraction/day
+
+uptake:                 # Barber-Cushman imax/km/cmin, per nutrient  # RECALIBRATE
+  n: {imax: 2.0, km: 20.0, cmin: 1.0, stage_ratio: {germination: 0.2, seedling: 0.6, vegetative: 1.0, mature: 0.7}}
+  p: {imax: 0.4, km: 5.0,  cmin: 0.2, stage_ratio: {germination: 0.2, seedling: 0.6, vegetative: 1.0, mature: 0.7}}
+  k: {imax: 1.6, km: 15.0, cmin: 0.8, stage_ratio: {germination: 0.2, seedling: 0.6, vegetative: 1.0, mature: 0.7}}
+
+optimal:                # research-cited set-points
+  ph: 5.8
+  ec: 1.5               # dS/m, within Cornell 1.2 / UF 1.4-1.8
+  temp: 21.0            # solution/root-zone growth optimum
+
+tolerance:              # half-width before stress saturates
+  ph: 0.8
+  ec: 0.6
+  temp: 5.0

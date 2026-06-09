@@ -64,7 +64,8 @@ restart (cheap under systemd `Restart=`).
 ### Layer 4 — rules engine (Phase 3)
 
 Design locked in `PHASE3_PLAN.md` (defaults derived in `PHASE3_RESEARCH.md`;
-operator guide in `control.md`); implementation lands in stages P3-S2…S7.
+operator guide in `control.md`); implementation lands in stages P3-S2…S8 (S6 adds API-key auth + firewall
+hardening before the control UI ships).
 
 One control loop per `(reservoir_id, kind)` declared in the profile's
 `control:` section. Bounded bang-bang (fixed dose + cooldown + caps), no PID.
@@ -124,7 +125,8 @@ Recorded so they are not accidentally designed-in early:
 - MQTT / Eclipse Ditto or any message-bus integration
 - Cloud connectivity / remote fleet management
 - Multi-tenant support
-- Authentication / authorization
+- Full authentication / authorization (users, roles, HTTPS) — Phase 3 P3-S6
+  ships a single Bearer API key on mutating routes + firewall/ssh hardening
 - PID/proportional dosing, EC/nutrient auto-dosing, pH-up chemistry — the
   Phase-3 rules engine is pH-down bang-bang only
 - Aquaponics (fish-loop) support

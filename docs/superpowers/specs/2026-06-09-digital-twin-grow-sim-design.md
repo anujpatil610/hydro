@@ -184,6 +184,6 @@ Each fault carries `start`, `duration`, `severity`. Maps onto the Phase 3 resear
 1. Lettuce-specific MM `Imax/Km/Cmin` per nutrient (NO₃, NH₄, P, K) — cited source gives form only (tree-root values).
 2. Quantitative EC↔individual-ion conductivity coefficients (`k_n/k_p/k_k/k_acc`).
 3. Parameterized `dpH/dt` vs nitrate/cation uptake ratio + buffering capacity.
-4. Whether one OSS repo bundles growth + Carmassi-Sonneveld + Penman-Monteith, or submodels must be assembled.
+4. ~~Whether one OSS repo bundles growth + Carmassi-Sonneveld + Penman-Monteith~~ → **RESOLVED (targeted search, 2026-06-09): no bundled repo exists. Assemble from submodels.** Reuse van Henten growth math (re-implement from paper) and PCSE's Penman-Monteith (`evapotranspiration`, BSD) as a reference; **author the nutrient-chemistry layer ourselves** (no OSS code exists — Carmassi-Sonneveld / Barber-Cushman are paper-only). GreenLight-Gym2 = architecture reference only (AGPL-3.0, tomato, zero chemistry — not a dependency). Refs: github.com/ajwdewit/pcse, github.com/BartvLaatum/GreenLight-Gym2, arXiv 2006.07081.
 
 **Key sources:** Cornell CEA Lettuce Handbook; UF/IFAS HS1422; van Straten/van Henten (IFAC 2020); Mayborne MSR thesis (NiCoLet B3); MDPI Horticulturae 10(2):117 (Carmassi-Sonneveld + Penman-Monteith); Frantz PMC7783079; SciPy `solve_ivp` docs; NumPy parallel RNG docs.

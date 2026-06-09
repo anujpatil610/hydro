@@ -1,22 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HistoryChart } from "./components/HistoryChart";
 import { ZoneSection } from "./components/ZoneSection";
+import { TwinDashboard } from "./components/twin/TwinDashboard";
 import { api } from "./lib/api";
 import type { Health, Reading, Topology } from "./lib/schema";
 import { buildLayout } from "./lib/topology";
-
-function useInterval(fn: () => void, ms: number) {
-  const saved = useRef(fn);
-  useEffect(() => {
-    saved.current = fn;
-  }, [fn]);
-  useEffect(() => {
-    const tick = () => saved.current();
-    tick();
-    const id = setInterval(tick, ms);
-    return () => clearInterval(id);
-  }, [ms]);
-}
+import { twinApi } from "./lib/twin";
+import { useInterval } from "./lib/useInterval";
 
 export default function App() {
   const [topology, setTopology] = useState<Topology | null>(null);
@@ -24,6 +14,21 @@ export default function App() {
   const [latest, setLatest] = useState<Reading[]>([]);
   const [history, setHistory] = useState<Reading[]>([]);
   const [offline, setOffline] = useState(false);
+  const [hasTwin, setHasTwin] = useState(false);
+  const [view, setView] = useState<"system" | "twin">("system");
+
+  // Boot probe: /twin returns null on non-sim backends (404).
+  useEffect(() => {
+    twinApi
+      .twin()
+      .then((t) => {
+        if (t) {
+          setHasTwin(true);
+          setView("twin"); // sim mode: the grow view is the headline
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Topology is resolved once at boot (it changes only on a service restart).
   useEffect(() => {
@@ -67,6 +72,22 @@ export default function App() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
+          {hasTwin && (
+            <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5 text-xs">
+              {(["twin", "system"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  className={`rounded-full px-3 py-1 capitalize ${
+                    view === v ? "bg-leaf/20 text-leaf" : "text-slate-400"
+                  }`}
+                >
+                  {v === "twin" ? "grow" : "system"}
+                </button>
+              ))}
+            </div>
+          )}
           {health && (
             <span className="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-slate-300">
               {health.tier} · mode: <span className="text-blueprint">{health.mode}</span>
@@ -82,15 +103,21 @@ export default function App() {
         </div>
       </header>
 
-      <div className="space-y-6">
-        {views.map((v) => (
-          <ZoneSection key={v.zone.id} view={v} readingByDevice={readingByDevice} />
-        ))}
-      </div>
+      {view === "twin" && hasTwin ? (
+        <TwinDashboard latest={latest} />
+      ) : (
+        <>
+          <div className="space-y-6">
+            {views.map((v) => (
+              <ZoneSection key={v.zone.id} view={v} readingByDevice={readingByDevice} />
+            ))}
+          </div>
 
-      <section className="mt-6">
-        <HistoryChart devices={sensorDevices} history={history} />
-      </section>
+          <section className="mt-6">
+            <HistoryChart devices={sensorDevices} history={history} />
+          </section>
+        </>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
-from service.profile.loader import load_profile
 from hal.sim.build import build_world
+from service.profile.loader import load_profile
 
 
 def test_build_world_from_bench_profile():

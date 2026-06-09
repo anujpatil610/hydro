@@ -1,5 +1,4 @@
 import pytest
-
 from hal.sim.build import build_world
 from service.profile.loader import load_profile
 

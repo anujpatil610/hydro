@@ -25,7 +25,7 @@ bench to a multi-zone farm; only the profile changes.
 │     registry      hal/device_set.py, hal/drivers/*          │
 ├─────────────────────────────────────────────────────────────┤
 │ 2 · HAL           Sensor / Pump ABCs, Reading, conversions; │
-│                   mock + real implementations               │
+│                   mock + real + sim implementations         │
 ├─────────────────────────────────────────────────────────────┤
 │ 1 · OS            Raspberry Pi OS, I2C + 1-Wire, systemd    │
 └─────────────────────────────────────────────────────────────┘
@@ -60,6 +60,21 @@ N-device system driven by data:
 
 Topology is **resolved once at boot**; changing a profile requires a service
 restart (cheap under systemd `Restart=`).
+
+### Layer 2 — `sim` mode: mechanistic digital twin
+
+A third HAL mode, `HYDRO_MODE=sim` (driver `sim`), backs the sensors with a
+mechanistic closed-loop simulation instead of mock oscillation or real hardware.
+A single `World` (`hal/sim/world.py`) owns per-reservoir plant + reservoir + zone
+state and integrates the coupled growth/uptake/water ODEs with SciPy `solve_ivp`
+(LSODA); sim sensors read observed (noisy) values from it and sim pumps dose back
+into it, closing the control loop. Crop agronomy lives in `crops/<name>.yaml`
+(growth, Barber-Cushman NPK uptake, optimal bands); a stochastic layer
+(`hal/sim/noise.py`) adds seeded sensor noise and injectable faults. The service,
+poller, DB, and API are unchanged — they cannot tell `sim` from `real`. Used both
+as a live control testbed (`speed=1`) and, later, a synthetic-data factory.
+Design + research: `docs/superpowers/specs/2026-06-09-digital-twin-grow-sim-design.md`.
+Run it with `HYDRO_PROFILE=profiles/bench-sim.yaml`.
 
 ### Layer 4 — rules engine (Phase 3)
 

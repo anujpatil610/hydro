@@ -1,5 +1,6 @@
-from hal.base import Reading, PumpResult
-from hal.sim.drivers import SimSensor, SimPump
+from hal.base import PumpResult, Reading
+from hal.sim.drivers import SimPump, SimSensor
+
 from tests.sim.test_world import _world
 
 
@@ -29,7 +30,7 @@ def test_sim_pump_dose_feeds_world():
 
 
 def test_clogged_pump_delivers_less():
-    from hal.sim.noise import NoiseModel, Fault
+    from hal.sim.noise import Fault, NoiseModel
     w = _world()
     noise = NoiseModel(seed=7, faults=[Fault(kind="clog", metric="pump",
                                              start_s=0.0, duration_s=1e9, severity=1.0)])

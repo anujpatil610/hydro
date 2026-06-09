@@ -1,4 +1,4 @@
-from hal.sim.noise import NoiseModel, Fault
+from hal.sim.noise import Fault, NoiseModel
 
 
 def test_same_seed_reproduces_observations():

@@ -57,6 +57,7 @@ select = ["E", "F", "I", "UP", "B", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests", "service/tests"]
+markers = ["slow: long-running simulation tests"]
 
 [tool.mypy]
 python_version = "3.11"

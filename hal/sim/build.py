@@ -13,8 +13,10 @@ from hal.sim.reservoir import ReservoirModel
 from hal.sim.world import ReservoirUnit, World
 
 # Starting solution per litre (mg/L) and EC/pH defaults  # RECALIBRATE
+# Conductivity coefficients are calibrated so the starting solution sits near the
+# lettuce EC optimum (~1.5 dS/m): 0.004*100 + 0.006*20 + 0.005*80 + 0.003*150 = 1.37.
 _START = {"n": 100.0, "p": 20.0, "k": 80.0, "acc": 150.0, "ph": 5.8, "temp": 21.0}
-_K_EC = {"n": 0.0005, "p": 0.0008, "k": 0.0006, "acc": 0.0004}
+_K_EC = {"n": 0.004, "p": 0.006, "k": 0.005, "acc": 0.003}
 
 
 def build_world(profile: ProfileFile, *, seed: int = 0,
@@ -42,7 +44,9 @@ def build_world(profile: ProfileFile, *, seed: int = 0,
             reservoir_id=res.id,
             plant=PlantModel(crop=crop, biomass_g=0.05, days_elapsed=0.0),
             reservoir=reservoir,
-            zone=Zone(zone_id=zone_id, air_temp_day_c=24.0, air_temp_night_c=19.0,
+            # Cool lettuce zone so solution temp tracks the ~21C root-zone optimum
+            # (design Section 5: lettuce zone ~18-20C). RECALIBRATE per crop/zone.
+            zone=Zone(zone_id=zone_id, air_temp_day_c=21.0, air_temp_night_c=18.0,
                       humidity_pct=65.0, photoperiod_h=16.0, ppfd=250.0),
         )
     poll = profile.profile.poll_seconds

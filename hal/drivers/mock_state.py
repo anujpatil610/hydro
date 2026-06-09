@@ -14,6 +14,7 @@ step counter, never RNG, so two builds of the same profile read identically.
 from __future__ import annotations
 
 import math
+import threading
 from dataclasses import dataclass, field
 
 from service.profile.schema import ProfileFile
@@ -64,6 +65,9 @@ class ReservoirState:
     profile: ProfileFile
     _bands: dict[str, dict[str, tuple[float, float]]] = field(default_factory=dict)
     _cells: dict[tuple[str, str], _Cell] = field(default_factory=dict)
+    # The poller (asyncio.to_thread) and manual pump dosing (run_in_threadpool)
+    # both mutate cells; guard the read-modify-write so a dose is never lost.
+    _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def __post_init__(self) -> None:
         self._bands = _reservoir_bands(self.profile)
@@ -85,7 +89,8 @@ class ReservoirState:
 
     def current(self, reservoir: str, kind: str) -> float:
         """The underlying stored value (no oscillation, no step advance)."""
-        return self._cell(reservoir, kind).value
+        with self._lock:
+            return self._cell(reservoir, kind).value
 
     def volume_of(self, reservoir: str) -> float:
         """Litres of the named reservoir (for dose-fraction scaling)."""
@@ -96,27 +101,29 @@ class ReservoirState:
 
     def sample(self, reservoir: str, kind: str) -> float:
         """Decay toward target, advance the oscillator, return the read value."""
-        cell = self._cell(reservoir, kind)
-        cell.value += (cell.target - cell.value) * _DECAY
-        amp, period = _OSC.get(kind, (0.0, 1.0))
-        read = cell.value + amp * math.sin(cell.step / period)
-        cell.step += 1
-        return round(read, _DECIMALS.get(kind, 1))
+        with self._lock:
+            cell = self._cell(reservoir, kind)
+            cell.value += (cell.target - cell.value) * _DECAY
+            amp, period = _OSC.get(kind, (0.0, 1.0))
+            read = cell.value + amp * math.sin(cell.step / period)
+            cell.step += 1
+            return round(read, _DECIMALS.get(kind, 1))
 
     def dose(self, reservoir: str, role: str, *, ml: float, volume_l: float) -> None:
         """Apply a dosing pump's effect to this reservoir's chemistry."""
         if volume_l <= 0:
             raise ValueError("volume_l must be positive")
         fraction = ml / volume_l
-        if role == "dose-ph-down":
-            self._adjust(reservoir, "ph", -_PH_GAIN * fraction, lo=0.0, hi=14.0)
-        elif role == "dose-ph-up":
-            self._adjust(reservoir, "ph", _PH_GAIN * fraction, lo=0.0, hi=14.0)
-        elif role == "dose-nutrient":
-            self._adjust(reservoir, "tds", _TDS_GAIN * fraction, lo=0.0)
-            self._adjust(reservoir, "ec", _EC_GAIN * fraction, lo=0.0)
-        # Any other role (e.g. dose-generic) runs the pump but leaves chemistry
-        # unchanged — the run is still recorded by the pump itself.
+        with self._lock:
+            if role == "dose-ph-down":
+                self._adjust(reservoir, "ph", -_PH_GAIN * fraction, lo=0.0, hi=14.0)
+            elif role == "dose-ph-up":
+                self._adjust(reservoir, "ph", _PH_GAIN * fraction, lo=0.0, hi=14.0)
+            elif role == "dose-nutrient":
+                self._adjust(reservoir, "tds", _TDS_GAIN * fraction, lo=0.0)
+                self._adjust(reservoir, "ec", _EC_GAIN * fraction, lo=0.0)
+            # Any other role (e.g. dose-generic) runs the pump but leaves
+            # chemistry unchanged — the run is still recorded by the pump itself.
 
     def _adjust(
         self, reservoir: str, kind: str, delta: float, *, lo: float, hi: float | None = None

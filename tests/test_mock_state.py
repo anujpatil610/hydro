@@ -103,3 +103,38 @@ def test_sample_stays_in_plausible_range_undosed() -> None:
     for _ in range(50):
         v = state.sample("resA", "ph")
         assert 5.5 <= v <= 6.5
+
+
+def test_concurrent_doses_are_not_lost() -> None:
+    """The poller thread and pump threadpool mutate state concurrently; doses
+    must not be lost to a read-modify-write race (mock is the shipped default)."""
+    import threading
+
+    from hal.drivers.mock_state import ReservoirState
+
+    state = ReservoirState(_commercial())
+    seed = state.current("resA", "tds")
+    threads_n, doses_each = 16, 200
+    # dose-nutrient adds _TDS_GAIN * ml/volume_l to tds; pick round numbers.
+    vol = state.volume_of("resA")
+
+    def worker() -> None:
+        for _ in range(doses_each):
+            state.dose("resA", "dose-nutrient", ml=1.0, volume_l=vol)
+
+    barrier = threading.Barrier(threads_n)
+
+    def run() -> None:
+        barrier.wait()
+        worker()
+
+    threads = [threading.Thread(target=run) for _ in range(threads_n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    from hal.drivers.mock_state import _TDS_GAIN
+
+    expected = seed + _TDS_GAIN * (1.0 / vol) * threads_n * doses_each
+    assert state.current("resA", "tds") == pytest.approx(expected)

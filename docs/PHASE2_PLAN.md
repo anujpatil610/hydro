@@ -170,7 +170,7 @@ def zone_of(device: Device, profile: ProfileFile) -> str | None:
 
 ## 2 · Two example profiles
 
-### 2.1 `profiles/bench.yaml` — byte-for-byte behavior parity with current Phase 1
+### 2.1 `profiles/bench.yaml` — contract parity with current Phase 1
 
 Reproduces exactly: pH@A0, TDS@A1 (0x48), DS18B20, pump@GPIO17, `ml_per_min=50`, lettuce bands matching `metrics.ts` (ph 5.5–6.5, tds 800–1200, temp 18–24), retention 24h, poll 10s, mock default.
 
@@ -199,7 +199,7 @@ devices:
   - { id: pump_resA, kind: pump, driver: relay-gpio, role: dose-generic, reservoir: resA, binding: { gpio: 17 }, spec: { ml_per_min: 50 } }
 ```
 
-Parity test (Stage 3/4): the `DeviceSet` from `bench.yaml` yields exactly 3 sensors of kinds {ph,tds,temp} + 1 pump; mock reads land in the same ranges current tests assert; `/sensors` returns 3 rows; pump test returns the same `estimated_ml` for the same input.
+Parity test (Stage 3/4): the `DeviceSet` from `bench.yaml` yields exactly 3 sensors of kinds {ph,tds,temp} + 1 pump; `/sensors` returns 3 rows; pump test returns the same `estimated_ml` for the same input. **Parity is at the contract level (shape, kinds, units, in-band values), not exact mock values** — the closed-loop mock seeds each kind to its crop-band midpoint (e.g. bench TDS centers on 1000 ppm vs Phase-1's arbitrary ~900), so readings differ in value while staying in-band and identical in shape.
 
 ### 2.2 `profiles/commercial.yaml` — multi-zone, multi-pump (proves scale-by-config)
 
@@ -426,7 +426,7 @@ class Reading(SQLModel, table=True):
 
 ### 5.2 Default-profile back-compat
 
-`HYDRO_PROFILE` defaults to `profiles/bench.yaml`. `bench.yaml` reproduces the exact current rig, so with no env change the system behaves as today (3 sensors, 1 pump, 24h, same bands). `service/config.py` keeps `mode`, `pump_ml_per_min`, `retention_hours`, `poll_seconds` as fallbacks consumed only if a profile omits them / for the legacy alias path. Acceptance: `bench.yaml` run is indistinguishable from current Phase 1 (regression tests in §6).
+`HYDRO_PROFILE` defaults to `profiles/bench.yaml`. `bench.yaml` reproduces the exact current rig, so with no env change the system behaves as today (3 sensors, 1 pump, 24h, same bands). `service/config.py` keeps `mode`, `pump_ml_per_min`, `retention_hours`, `poll_seconds` as fallbacks consumed only if a profile omits them / for the legacy alias path. Acceptance: `bench.yaml` run is contract-compatible with current Phase 1 — same endpoints, shapes, device set, and in-band behavior (regression tests in §6); exact mock values differ (see §2.1).
 
 ### 5.3 Route compatibility (answers Q5)
 

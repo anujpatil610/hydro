@@ -1,0 +1,85 @@
+# Commercial farm — proves scale-by-config. SAME CODE as bench.yaml, only more
+# entries: 6 zones, 6 reservoirs, 24 sensors (ph/tds/temp/level each), 12 pumps
+# (pH-down + nutrient each). All mock this phase (real HW scope stays
+# pH/TDS/temp + pump; extra kinds are mock-only until hardware is specced).
+profile:
+  id: commercial-01
+  name: "Commercial Farm"
+  tier: commercial
+  mode_default: mock
+  retention_hours: 72
+  poll_seconds: 10
+
+crops:
+  lettuce:
+    bands:
+      ph:   { min: 5.5, max: 6.5 }
+      ec:   { min: 0.8, max: 1.2 }
+      tds:  { min: 560, max: 840 }
+      temp: { min: 18,  max: 24 }
+  basil:
+    bands:
+      ph:   { min: 5.5, max: 6.5 }
+      ec:   { min: 1.0, max: 1.6 }
+      tds:  { min: 700, max: 1120 }
+      temp: { min: 20,  max: 26 }
+
+reservoirs:
+  - { id: resA, volume_l: 200, zone: zoneA }
+  - { id: resB, volume_l: 200, zone: zoneB }
+  - { id: resC, volume_l: 200, zone: zoneC }
+  - { id: resD, volume_l: 300, zone: zoneD }
+  - { id: resE, volume_l: 300, zone: zoneE }
+  - { id: resF, volume_l: 300, zone: zoneF }
+
+zones:
+  - { id: zoneA, crop: lettuce, reservoir: resA, racks: [ { id: rackA1, tray_size: "nft-3m", channels: 6, plant_capacity: 108 } ] }
+  - { id: zoneB, crop: lettuce, reservoir: resB, racks: [ { id: rackB1, tray_size: "nft-3m", channels: 6, plant_capacity: 108 } ] }
+  - { id: zoneC, crop: lettuce, reservoir: resC, racks: [ { id: rackC1, tray_size: "nft-3m", channels: 6, plant_capacity: 108 } ] }
+  - { id: zoneD, crop: basil,   reservoir: resD, racks: [ { id: rackD1, tray_size: "dwc-4m", channels: 8, plant_capacity: 160 } ] }
+  - { id: zoneE, crop: basil,   reservoir: resE, racks: [ { id: rackE1, tray_size: "dwc-4m", channels: 8, plant_capacity: 160 } ] }
+  - { id: zoneF, crop: basil,   reservoir: resF, racks: [ { id: rackF1, tray_size: "dwc-4m", channels: 8, plant_capacity: 160 } ] }
+
+devices:
+  # --- zone A ---
+  - { id: ph_resA,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resA, binding: { i2c_addr: 0x48, channel: 0 } }
+  - { id: tds_resA,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resA, binding: { i2c_addr: 0x48, channel: 1 } }
+  - { id: temp_resA,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resA, binding: { onewire_id: "28-resA" } }
+  - { id: level_resA,      kind: level, driver: mock,       role: monitor,       reservoir: resA }
+  - { id: pump_phdown_A,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resA, binding: { gpio: 17 }, spec: { ml_per_min: 50 } }
+  - { id: pump_nutrient_A, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resA, binding: { gpio: 27 }, spec: { ml_per_min: 50 } }
+  # --- zone B ---
+  - { id: ph_resB,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resB, binding: { i2c_addr: 0x49, channel: 0 } }
+  - { id: tds_resB,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resB, binding: { i2c_addr: 0x49, channel: 1 } }
+  - { id: temp_resB,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resB, binding: { onewire_id: "28-resB" } }
+  - { id: level_resB,      kind: level, driver: mock,       role: monitor,       reservoir: resB }
+  - { id: pump_phdown_B,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resB, binding: { gpio: 22 }, spec: { ml_per_min: 50 } }
+  - { id: pump_nutrient_B, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resB, binding: { gpio: 23 }, spec: { ml_per_min: 50 } }
+  # --- zone C ---
+  - { id: ph_resC,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resC, binding: { i2c_addr: 0x4a, channel: 0 } }
+  - { id: tds_resC,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resC, binding: { i2c_addr: 0x4a, channel: 1 } }
+  - { id: temp_resC,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resC, binding: { onewire_id: "28-resC" } }
+  - { id: level_resC,      kind: level, driver: mock,       role: monitor,       reservoir: resC }
+  - { id: pump_phdown_C,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resC, binding: { gpio: 24 }, spec: { ml_per_min: 50 } }
+  - { id: pump_nutrient_C, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resC, binding: { gpio: 25 }, spec: { ml_per_min: 50 } }
+  # --- zone D ---
+  - { id: ph_resD,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resD, binding: { i2c_addr: 0x4b, channel: 0 } }
+  - { id: tds_resD,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resD, binding: { i2c_addr: 0x4b, channel: 1 } }
+  - { id: temp_resD,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resD, binding: { onewire_id: "28-resD" } }
+  - { id: level_resD,      kind: level, driver: mock,       role: monitor,       reservoir: resD }
+  - { id: pump_phdown_D,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resD, binding: { gpio: 5 },  spec: { ml_per_min: 80 } }
+  - { id: pump_nutrient_D, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resD, binding: { gpio: 6 },  spec: { ml_per_min: 80 } }
+  # --- zone E ---
+  - { id: ph_resE,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resE, binding: { i2c_addr: 0x48, channel: 2 } }
+  - { id: tds_resE,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resE, binding: { i2c_addr: 0x48, channel: 3 } }
+  - { id: temp_resE,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resE, binding: { onewire_id: "28-resE" } }
+  - { id: level_resE,      kind: level, driver: mock,       role: monitor,       reservoir: resE }
+  - { id: pump_phdown_E,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resE, binding: { gpio: 12 }, spec: { ml_per_min: 80 } }
+  - { id: pump_nutrient_E, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resE, binding: { gpio: 13 }, spec: { ml_per_min: 80 } }
+  # --- zone F ---
+  - { id: ph_resF,         kind: ph,    driver: ads1115,    role: monitor,       reservoir: resF, binding: { i2c_addr: 0x49, channel: 2 } }
+  - { id: tds_resF,        kind: tds,   driver: ads1115,    role: monitor,       reservoir: resF, binding: { i2c_addr: 0x49, channel: 3 } }
+  - { id: temp_resF,       kind: temp,  driver: ds18b20,    role: monitor,       reservoir: resF, binding: { onewire_id: "28-resF" } }
+  - { id: level_resF,      kind: level, driver: mock,       role: monitor,       reservoir: resF }
+  - { id: pump_phdown_F,   kind: pump,  driver: relay-gpio, role: dose-ph-down,  reservoir: resF, binding: { gpio: 16 }, spec: { ml_per_min: 80 } }
+  - { id: pump_nutrient_F, kind: pump,  driver: relay-gpio, role: dose-nutrient, reservoir: resF, binding: { gpio: 26 }, spec: { ml_per_min: 80 } }

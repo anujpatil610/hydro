@@ -8,14 +8,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HYDRO_", env_file=".env", extra="ignore")
 
-    mode: str = "mock"
+    # Phase 2: the deployment profile selects device count/type/binding.
+    # HYDRO_PROFILE. Defaults to the bench rig (Phase-1 parity).
+    profile: str = "profiles/bench.yaml"
+
     host: str = "0.0.0.0"
     port: int = 8000
     db_path: str = "data/hydro.db"
+    calibration_path: str = "data/calibration.json"
+
+    # Fallbacks used only when a profile omits them (every shipped profile sets
+    # its own retention_hours / poll_seconds). ``mode`` is unused by the
+    # profile path and kept for the legacy build_hal factory only.
+    mode: str = "mock"
     retention_hours: int = 24
     poll_seconds: int = 10
     pump_ml_per_min: float = 50.0
-    calibration_path: str = "data/calibration.json"
 
     # Extra dev origins so the Vite dev server reaches the API before mDNS exists.
     cors_origins: tuple[str, ...] = (

@@ -1,0 +1,28 @@
+# DELIBERATELY BROKEN test fixture (leading underscore = not a real deployment).
+# Real mode + two devices claiming GPIO 17 and the (0x48, 0) ADC channel.
+# Loading this MUST fail with a ProfileError (see tests/test_profile_loader.py).
+profile:
+  id: conflict-01
+  name: "Conflict Fixture"
+  tier: pilot
+  mode_default: real
+  retention_hours: 24
+  poll_seconds: 10
+
+crops:
+  lettuce:
+    bands:
+      ph:   { min: 5.5, max: 6.5 }
+      temp: { min: 18,  max: 24 }
+
+reservoirs:
+  - { id: resA, volume_l: 100, zone: zoneA }
+
+zones:
+  - { id: zoneA, crop: lettuce, reservoir: resA, racks: [] }
+
+devices:
+  - { id: ph_resA,    kind: ph,   driver: ads1115,    role: monitor,      reservoir: resA, binding: { i2c_addr: 0x48, channel: 0 } }
+  - { id: ph_dupe,    kind: ph,   driver: ads1115,    role: monitor,      reservoir: resA, binding: { i2c_addr: 0x48, channel: 0 } }
+  - { id: pump_resA,  kind: pump, driver: relay-gpio, role: dose-ph-down, reservoir: resA, binding: { gpio: 17 }, spec: { ml_per_min: 50 } }
+  - { id: pump_dupe,  kind: pump, driver: relay-gpio, role: dose-nutrient, reservoir: resA, binding: { gpio: 17 }, spec: { ml_per_min: 50 } }

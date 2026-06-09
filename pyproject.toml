@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "sqlmodel>=0.0.22,<0.1",
+    "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,7 @@ dev = [
     "httpx>=0.28,<0.29",
     "ruff>=0.8,<0.9",
     "mypy>=1.14,<2",
+    "types-PyYAML>=6,<7",
 ]
 
 [tool.uv]

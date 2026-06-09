@@ -20,7 +20,8 @@ A closed-loop digital twin of a hydroponic grow that lets a virtual crop (lettuc
 ## Key decisions
 
 - **Modeling:** hybrid — mechanistic core (biology + chemistry) + stochastic layer (noise, drift, faults).
-- **Parameters:** seeded from published hydroponic lettuce literature, exposed as tunable config, recalibrated once real-farm data arrives.
+- **Parameters:** seeded from published hydroponic lettuce literature (see Research Appendix), exposed as tunable config, recalibrated once real-farm data arrives.
+- **Reuse over hand-rolling:** adopt established model forms (van Henten/van Straten growth ODE, Barber-Cushman MM uptake, Carmassi-Sonneveld + Penman-Monteith water/nutrient), integrated with SciPy `solve_ivp`. Do NOT use PCSE/WOFOST (field crops only).
 - **Crop:** crop-as-config (`crops/lettuce.yaml`); ship lettuce only, other leafy greens drop in as files with no code change.
 - **Nutrients:** per-nutrient **NPK** (not a lumped proxy).
 - **Integration:** closed-loop `sim` HAL backend (`HYDRO_MODE=sim`); dosing writes back into the world. Poller/DB/API untouched.
@@ -62,7 +63,7 @@ Three state groups. Everything here is hidden truth; sensors expose only a noisy
 - per-nutrient uptake demand, `water_uptake_ml`
 
 **Reservoir state:**
-- `volume_l`, `n_mass_mg`, `p_mass_mg`, `k_mass_mg` → derive `ec_true`
+- `volume_l`, `n_mass_mg`, `p_mass_mg`, `k_mass_mg`, `acc_mass_mg` (accumulating Ca/Mg/HCO₃ pool) → derive `ec_true`
 - `ph_true` (buffering capacity `beta`), `temp_true_c`
 - cumulative `dose_events`
 
@@ -75,21 +76,21 @@ Three state groups. Everything here is hidden truth; sensors expose only a noisy
 
 ## Plant growth model (mechanistic core)
 
-Coefficients in `lettuce.yaml`; equations fixed, numbers tunable.
+Coefficients in `lettuce.yaml`; equations fixed, numbers tunable. **Reuse published model forms — do not hand-derive** (research-backed, see appendix).
 
-**Growth** — logistic biomass toward a stage/crop max, rate modulated by health so poor conditions stunt growth:
-`dBiomass/dt = r · B · (1 − B/B_max) · health`
-Leaf area from biomass via allometric ratio. Stage advances on accumulated growing-degree/days (not fixed calendar), so stress that slows growth also delays maturity.
+**Growth** — adopt the **van Henten / van Straten (2011)** lettuce carbon-balance ODE as the primary model for the full 35-day cycle: `dB/dt = k_ab·φ_Cphot − k_Bresp·φ_Cresp`, with saturating (Michaelis-Menten-like) photosynthesis, canopy light interception `(1 − e^(−k_LAI·B))`, a quadratic temperature term, and exponential respiration `~ k_resp·B·2^(0.1T−2.5)`. **NiCoLet B3** (first-order carbon balance, fully published parameter set: `k=4e-7 s⁻¹, v=22.1, a=0.2, ε=0.2, c=0.0693 /°C, T*=20°C, θ=0.3`) is a validated short-horizon (2–4 week) alternative, selectable via config. The growth rate is further modulated by a `health` multiplier so poor conditions stunt growth. Leaf area from biomass via allometric ratio. Stage advances on accumulated growing-degree/days (not fixed calendar), so stress that slows growth also delays maturity.
 
-**Per-nutrient uptake** — each of N/P/K with its own Michaelis–Menten kinetics, scaled by biomass and a stage-specific demand ratio:
-`uptake_X = Vmax_X · biomass · [X]/(Km_X + [X])`, `[X] = mass_X / volume_l`
-N, P, K deplete at different rates/ratios over the grow. Water uptake (transpiration) scales with biomass, light, air temp/humidity. Both pull mass/volume from the reservoir each tick.
+> Do NOT use PCSE/WOFOST/LINTUL — field-crop frameworks with no lettuce/hydroponics support (research-refuted as a fit).
+
+**Per-nutrient uptake** — each of N/P/K via the **Barber-Cushman modified Michaelis-Menten** form (research-backed, directly reusable):
+`uptake_X = Imax_X · (C_X − Cmin_X) / (Km_X + (C_X − Cmin_X))`, `C_X = mass_X / volume_l`
+where `Cmin_X` is the threshold concentration for zero net influx. Scaled by biomass and a stage-specific demand ratio. N, P, K deplete at different rates/ratios over the grow. (Alternative, config-selectable: the transpiration-coupled **Carmassi-Sonneveld** apparent-uptake submodel.) Water uptake (transpiration) follows a **Penman-Monteith (FAO/ASCE)** form on a 24h diurnal cycle, scaling with biomass, light, air temp/humidity. Both pull mass/volume from the reservoir each tick.
 
 **Health & stress** — four stress factors as functions of distance outside crop-optimal bands; nutrient stress = worst of N/P/K. `health` relaxes toward `1 − max(stress)` with a time constant, so damage accumulates/recovers gradually. Sustained stress → lower health → slower growth → stalled stage progression.
 
 ## Reservoir chemistry
 
-**EC** (derived): `ec_true = k_n·[N] + k_p·[P] + k_k·[K]`. Moved by uptake (removes mass, EC falls), transpiration/evaporation (removes water, EC concentrates), dosing (adds mass), top-up (adds volume). EC alone does not uniquely determine composition — realistic hidden structure for state estimation.
+**EC** (derived): `ec_true = k_n·[N] + k_p·[P] + k_k·[K] + k_acc·[ACC]`. The reservoir also carries an **accumulating-ion pool** `acc_mass_mg` (Ca/Mg/HCO₃) that is *not* taken up at the rate water leaves — so as N/P/K deplete, these concentrate and **inflate EC, masking nutrient depletion** (research-confirmed: EC can sit on target while the plant starves). EC is moved by uptake (removes N/P/K mass, that contribution falls), transpiration/evaporation (removes water, everything concentrates), dosing (adds mass), top-up (adds volume, dilutes). EC alone does NOT uniquely determine composition — this is the realistic hidden structure a state-estimation model must learn to untangle.
 
 **pH** — buffering capacity: `dpH = acid_load / beta`. Acid load driven mainly by N uptake (nitrate-dominant → upward drift) per crop config, plus pH-up/down dosing. `beta` high = stiff/stable water, low = twitchy.
 
@@ -103,7 +104,7 @@ All coefficients (`k_n`/`k_p`/`k_k`, `beta`, drift rates, thermal constant, dose
 
 `Zone` holds a target climate recipe (setpoints actively held, not free weather):
 - `air_temp_setpoint_c`, `humidity_setpoint_pct`, `photoperiod`, `ppfd`.
-- Each crop maps to a zone (lettuce zone cool ~18–20°C / 16h light); run config places reservoirs in zones.
+- Each crop maps to a zone (lettuce zone: air **24°C day / 19°C night**, 16h light; solution ≤25°C — research-backed Cornell set-points); run config places reservoirs in zones.
 
 **Controlled ≠ perfect.** Zone `air_temp_c` = setpoint + light-load offset (warmer under lights) + control ripple (±~0.3°C bang-bang/PID oscillation) + disturbances injected by the noise layer (door open, HVAC hiccup). Tight bands, not flat — matches real controlled-environment logs.
 
@@ -120,9 +121,11 @@ All coefficients (`k_n`/`k_p`/`k_k`, `beta`, drift rates, thermal constant, dose
 
 Same World, same equations — only pacing differs. A 35-day lettuce grow at `sample_interval=10min` ≈ 5k rows. A run is fully determined by `(crop, zones/environment, seed, speed, duration)`.
 
+**Integration method (research-backed).** Integrate the coupled biology+chemistry ODEs with **SciPy `solve_ivp`** using **LSODA** (automatic stiff/non-stiff switching — low-effort default when stiffness is uncertain) or **Radau/BDF** for the stiff regime. A fixed-step forward-Euler was explicitly refuted as inadequate. `solve_ivp` is advanced over each `integration_step` (or batched per `sample_interval`); state carries across steps so dosing/faults injected between calls take effect on the next solve. Runs comfortably on the Pi 5 in live mode (the work per real-time tick is tiny).
+
 ## Stochastic & fault layer
 
-All randomness flows from the run `seed` (fully reproducible). Toggled/parameterized per run.
+All randomness flows from the run `seed` via NumPy **`SeedSequence.spawn()`** — each worker/sensor gets a statistically independent, collision-safe stream (research-backed; collision prob. ~2⁻⁸⁸ even at 1M streams), so parallel batch generation is fully reproducible with no inter-worker coordination and no GPU. Toggled/parameterized per run.
 
 **Always-on sensor realism** (every observed value):
 - Gaussian measurement noise per sensor (pH ±0.05, EC ±2%, temp ±0.2°C — config).
@@ -152,4 +155,35 @@ Each fault carries `start`, `duration`, `severity`. Maps onto the Phase 3 resear
 - Dataset serialization / run configs (Sub-project B).
 - ML models (Sub-project C).
 - Zone climate actuators under rules-engine control (future hook).
-- Per-ion species chemistry beyond lumped N/P/K.
+- Per-ion species chemistry beyond lumped N/P/K + an accumulating Ca/Mg/HCO₃ pool.
+
+## Research Appendix (2026-06-09 deep-research, 22 verified claims)
+
+**Model selection (build-vs-reuse → reuse forms):**
+- Biomass: **van Henten / van Straten (2011)** carbon-balance ODE (full cycle); **NiCoLet B3** short-horizon alt with published params (`k=4e-7 s⁻¹, v=22.1, a=0.2, ε=0.2, c=0.0693/°C, T*=20°C, θ=0.3`).
+- Per-nutrient uptake: **Barber-Cushman** modified MM `In = Imax(Cl−Cmin)/(Km+(Cl−Cmin))`.
+- Water/nutrient alt: **Carmassi-Sonneveld** apparent-uptake + **Penman-Monteith** (FAO/ASCE) transpiration.
+- **Avoid PCSE/WOFOST/LINTUL** — field crops only, no lettuce/hydroponics.
+
+**Operating envelope (defaults, treat as protocol-specific not biological constants):**
+
+| Variable | Value | Source |
+|---|---|---|
+| pH optimum / band | 5.8 / 5.6–6.0 (6.0–7.0 *refuted*) | Cornell CEA Handbook |
+| EC target | 1.2 dS/m (Cornell) · 1.4–1.8 mS/cm ideal (UF/IFAS) | Cornell; UF/IFAS HS1422 |
+| Air temp | 24°C day / 19°C night | Cornell |
+| Solution temp | ≤25°C; growth opt ~21°C (root-zone), sugar peak ~18°C | Cornell; Thakulla 2021 |
+| Schedule | 35-day: seedling→d11 transplant→d21 respace→d35 harvest, ~150g head | Cornell |
+| Transpiration | 24h periodic, ~0 to −2 mg/s per plant (illustrative; size via Penman-Monteith) | PMC11521826 |
+
+**Chemistry caveat (design-shaping):** EC is *not* a proxy for individual ions — Ca/Mg/HCO₃ accumulate and inflate EC while N/P/K deplete (→ the `acc_mass_mg` pool). Source: Frantz/PMC7783079.
+
+**Implementation:** SciPy `solve_ivp` with **LSODA** (auto stiff-switch) or **Radau/BDF**; fixed-step Euler *refuted*. NumPy `SeedSequence.spawn()` for reproducible CPU batch streams.
+
+**Open questions → recalibrate-later config (defaults to be sourced at impl time):**
+1. Lettuce-specific MM `Imax/Km/Cmin` per nutrient (NO₃, NH₄, P, K) — cited source gives form only (tree-root values).
+2. Quantitative EC↔individual-ion conductivity coefficients (`k_n/k_p/k_k/k_acc`).
+3. Parameterized `dpH/dt` vs nitrate/cation uptake ratio + buffering capacity.
+4. Whether one OSS repo bundles growth + Carmassi-Sonneveld + Penman-Monteith, or submodels must be assembled.
+
+**Key sources:** Cornell CEA Lettuce Handbook; UF/IFAS HS1422; van Straten/van Henten (IFAC 2020); Mayborne MSR thesis (NiCoLet B3); MDPI Horticulturae 10(2):117 (Carmassi-Sonneveld + Penman-Monteith); Frantz PMC7783079; SciPy `solve_ivp` docs; NumPy parallel RNG docs.

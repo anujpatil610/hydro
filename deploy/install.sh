@@ -4,6 +4,9 @@ set -eu
 REMOTE=${1:-hydropi@172.20.6.122}
 REMOTE_DIR=${2:-hydro}
 MODE=${3:-mock}
+# Deployment profile (relative to the repo root on the Pi). Drives device
+# count/type/binding — see docs/profile-authoring.md.
+PROFILE=${4:-profiles/bench.yaml}
 
 if [ "$MODE" != "mock" ] && [ "$MODE" != "real" ]; then
   echo "ERROR: mode must be 'mock' or 'real'"
@@ -67,7 +70,7 @@ printf 'Syncing repository to remote: %s (%s)\n' "$REMOTE" "$REMOTE_DIR"
 sync_repo
 
 printf 'Installing and enabling service on remote\n'
-ssh "$REMOTE" "REMOTE_DIR=$REMOTE_DIR MODE=$MODE bash -s" <<'REMOTE_SCRIPT'
+ssh "$REMOTE" "REMOTE_DIR=$REMOTE_DIR MODE=$MODE PROFILE=$PROFILE bash -s" <<'REMOTE_SCRIPT'
 set -eu
 case "$REMOTE_DIR" in
   /*) ;;
@@ -77,6 +80,7 @@ cd "$REMOTE_DIR"
 if [ ! -e .env ]; then
   cat > .env <<ENV_EOF
 HYDRO_MODE=$MODE
+HYDRO_PROFILE=$PROFILE
 HYDRO_HOST=0.0.0.0
 HYDRO_PORT=8000
 HYDRO_DB_PATH=data/hydro.db
@@ -92,6 +96,12 @@ else
   if [ "$existing_mode" != "$MODE" ]; then
     echo "WARNING: existing .env has HYDRO_MODE=$existing_mode but deploy requested $MODE." >&2
     echo "         The service will keep running in '$existing_mode' mode." >&2
+    echo "         Edit .env and restart, or remove .env to regenerate." >&2
+  fi
+  existing_profile=$(grep -E '^HYDRO_PROFILE=' .env | cut -d= -f2 || true)
+  if [ -n "$existing_profile" ] && [ "$existing_profile" != "$PROFILE" ]; then
+    echo "WARNING: existing .env has HYDRO_PROFILE=$existing_profile but deploy requested $PROFILE." >&2
+    echo "         The service will keep running with '$existing_profile'." >&2
     echo "         Edit .env and restart, or remove .env to regenerate." >&2
   fi
 fi

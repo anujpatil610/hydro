@@ -25,6 +25,12 @@ This folder contains the headless Pi deploy artifacts for Hydro.
    ./deploy/install.sh hydropi@172.20.6.122 hydro real
    ```
 
+   An optional fourth argument selects the deployment profile (default
+   `profiles/bench.yaml`):
+   ```sh
+   ./deploy/install.sh hydropi@172.20.6.122 hydro mock profiles/commercial.yaml
+   ```
+
    On Git Bash, do not pass unquoted `~/hydro` — the shell expands it to a Windows
    path before the script runs. Use `hydro` (remote home-relative) instead.
 
@@ -38,5 +44,6 @@ This folder contains the headless Pi deploy artifacts for Hydro.
 - The service uses `~/.config/systemd/user/hydro.service` for the Pi user.
 - `install.sh` enables linger (`loginctl enable-linger`) so the service starts at boot without a login session.
 - `HYDRO_MODE` is controlled via `.env`. `install.sh` preserves an existing `.env` across re-deploys (and warns if its mode differs from the requested mode).
+- `HYDRO_PROFILE` selects the deployment profile (`profiles/*.yaml`) that declares every device — count, type, binding. The unit file sets a default of `profiles/bench.yaml`; a `HYDRO_PROFILE` line in `.env` overrides it. To switch profiles, edit `.env` and `systemctl --user restart hydro` (topology is resolved at boot only). See `../docs/profile-authoring.md`.
 - Sync uses `rsync` when available, else falls back to `tar` over ssh. The tar fallback does **not** delete stale remote files — wipe `~/hydro` first for a clean redeploy.
 - The app serves the built `web/dist` directory from FastAPI when present.

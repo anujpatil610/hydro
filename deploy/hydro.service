@@ -7,6 +7,8 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=%h/hydro
+# Default deployment profile; a HYDRO_PROFILE line in .env overrides this.
+Environment=HYDRO_PROFILE=profiles/bench.yaml
 EnvironmentFile=%h/hydro/.env
 ExecStart=%h/hydro/.venv/bin/uvicorn service.main:app --host $HYDRO_HOST --port $HYDRO_PORT
 Restart=on-failure

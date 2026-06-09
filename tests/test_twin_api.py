@@ -45,7 +45,10 @@ def test_twin_shape(sim_client):
     assert all(0.0 <= v <= 1.0 for v in res["stress"].values())
     assert set(res["npk"]) >= {"n_mg_l", "p_mg_l", "k_mg_l"}
     assert set(res["climate"]) == {"air_temp_c", "light_on", "ppfd"}
-    assert res["harvest_day"] == 35  # lettuce stage days sum
+    from hal.sim.crop import load_crop
+
+    expected = sum(s.days for s in load_crop(res["crop"]).stages)
+    assert res["harvest_day"] == expected  # sum of crop stage days
 
 
 def test_twin_history_returns_persisted_rows(sim_client):

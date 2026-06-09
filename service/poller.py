@@ -18,7 +18,7 @@ from hal.device_set import DeviceSet
 from sqlalchemy import Engine
 from sqlmodel import Session
 
-from service.db.models import Reading, TwinSample, naive_utc
+from service.db.models import Reading, TwinSample, naive_utc, npk_mg_l
 from service.db.session import prune_old
 from service.profile.loader import zone_of
 
@@ -95,16 +95,14 @@ class Poller:
         twin_rows: list[TwinSample] = []
         for rid in world.units:
             snap = world.snapshot(rid)
-            vol = float(snap["volume_l"]) or 1.0
+            n_mg_l, p_mg_l, k_mg_l = npk_mg_l(snap)
             twin_rows.append(TwinSample(
                 timestamp=now, reservoir_id=rid,
                 stage=str(snap["stage"]),
                 biomass_g=float(snap["biomass_g"]), health=float(snap["health"]),
                 ph_true=float(snap["ph_true"]), ec_true=float(snap["ec_true"]),
                 temp_true=float(snap["temp_true"]), volume_l=float(snap["volume_l"]),
-                n_mg_l=float(snap["n_mass_mg"]) / vol,
-                p_mg_l=float(snap["p_mass_mg"]) / vol,
-                k_mg_l=float(snap["k_mass_mg"]) / vol,
+                n_mg_l=n_mg_l, p_mg_l=p_mg_l, k_mg_l=k_mg_l,
                 faults=faults,
             ))
         return twin_rows

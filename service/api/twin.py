@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlmodel import Session
 
-from service.db.models import TwinSampleOut
+from service.db.models import TwinSampleOut, npk_mg_l
 from service.db.session import twin_history
 
 router = APIRouter(prefix="/twin")
@@ -87,8 +87,14 @@ def _stress_factor(kind: str, truth: dict[str, float], crop) -> float:
 
 @router.get("", response_model=TwinOut)
 def twin(request: Request) -> TwinOut:
+    # Imported lazily so non-sim deployments never touch the sim driver module.
     from hal.drivers.sim_drivers import noise_for_world
 
+    # Thread-safety invariant: unit.zone and unit.plant.crop are configuration,
+    # immutable after build_world() (CropConfig is frozen pydantic; nothing
+    # mutates Zone at runtime), so reading them unlocked while the poller
+    # thread steps the World is safe. All MUTABLE state (plant/reservoir) is
+    # read exclusively via the locked world.snapshot().
     world = _world_or_404(request)
     noise = noise_for_world(world)
     initial_volume = {r.id: r.volume_l for r in request.app.state.profile.reservoirs}
@@ -98,8 +104,13 @@ def twin(request: Request) -> TwinOut:
         snap = world.snapshot(rid)
         crop = unit.plant.crop
         stages = [(s.name, s.days) for s in crop.stages]
-        stage, progress = stage_progress(stages, float(snap["days_elapsed"]))
+        # snapshot()["stage"] is authoritative (one source of truth with the
+        # persisted TwinSample rows); stage_progress() supplies only the
+        # within-stage fraction.
+        stage = str(snap["stage"])
+        _, progress = stage_progress(stages, float(snap["days_elapsed"]))
         vol = float(snap["volume_l"]) or 1.0
+        n_mg_l, p_mg_l, k_mg_l = npk_mg_l(snap)
         truth = {
             "ph": float(snap["ph_true"]),
             "ec": float(snap["ec_true"]),
@@ -123,9 +134,7 @@ def twin(request: Request) -> TwinOut:
             npk=Npk(
                 n_mass_mg=float(snap["n_mass_mg"]), p_mass_mg=float(snap["p_mass_mg"]),
                 k_mass_mg=float(snap["k_mass_mg"]),
-                n_mg_l=float(snap["n_mass_mg"]) / vol,
-                p_mg_l=float(snap["p_mass_mg"]) / vol,
-                k_mg_l=float(snap["k_mass_mg"]) / vol,
+                n_mg_l=n_mg_l, p_mg_l=p_mg_l, k_mg_l=k_mg_l,
             ),
             stress=Stress(
                 ph=_stress_factor("ph", truth, crop),

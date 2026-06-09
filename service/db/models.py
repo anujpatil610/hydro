@@ -79,6 +79,20 @@ class TwinSample(SQLModel, table=True):
     faults: str = ""  # comma-joined "kind:metric" markers active at sample time
 
 
+def npk_mg_l(snap: dict) -> tuple[float, float, float]:
+    """(n, p, k) concentrations in mg/L from a World snapshot dict.
+
+    Guards a drained reservoir (volume 0) with a 1 L floor so the
+    conversion never divides by zero.
+    """
+    vol = float(snap["volume_l"]) or 1.0
+    return (
+        float(snap["n_mass_mg"]) / vol,
+        float(snap["p_mass_mg"]) / vol,
+        float(snap["k_mass_mg"]) / vol,
+    )
+
+
 class TwinSampleOut(BaseModel):
     timestamp: datetime
     reservoir_id: str

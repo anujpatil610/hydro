@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from service.config import Settings
 from service.main import create_app
 
@@ -37,6 +38,8 @@ def test_default_speed_is_live(sim_app_factory):
         world = app.state.device_set.world
         poll = app.state.profile.profile.poll_seconds
         assert world.clock.sample_interval_s == float(poll)
+        assert world.clock.speed == 1.0
+        assert client.get("/twin").json()["sim_speed"] == 1.0
 
 
 def test_twin_reports_sim_speed(sim_app_factory):
@@ -44,6 +47,12 @@ def test_twin_reports_sim_speed(sim_app_factory):
     with client:
         body = client.get("/twin").json()
         assert body["sim_speed"] == 60.0
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0])
+def test_invalid_speed_rejected_at_settings(bad):
+    with pytest.raises(ValidationError):
+        Settings(profile="profiles/bench-sim.yaml", sim_speed=bad)
 
 
 def test_speed_advances_day_fast(sim_app_factory):

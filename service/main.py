@@ -34,8 +34,6 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
             profile, calibration_path=Path(settings.calibration_path)
         )
         if device_set.world is not None and settings.sim_speed != 1.0:
-            if settings.sim_speed <= 0:
-                raise ValueError("HYDRO_SIM_SPEED must be > 0")
             clock = device_set.world.clock
             clock.speed = settings.sim_speed
             clock.sample_interval_s = meta.poll_seconds * settings.sim_speed

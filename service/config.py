@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
 
     # Sim time-lapse: each poll advances poll_seconds * sim_speed sim-seconds.
     # 1.0 = live; ~360 renders a 35-day grow in ~14 min. Sim mode only; restart to apply.
-    sim_speed: float = 1.0
+    sim_speed: float = Field(default=1.0, gt=0)
 
     # Extra dev origins so the Vite dev server reaches the API before mDNS exists.
     cors_origins: tuple[str, ...] = (

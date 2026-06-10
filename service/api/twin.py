@@ -68,6 +68,7 @@ class TwinReservoirOut(BaseModel):
 class TwinOut(BaseModel):
     sim: bool
     sim_time_s: float
+    sim_speed: float
     reservoirs: list[TwinReservoirOut]
 
 
@@ -149,7 +150,7 @@ def twin(request: Request) -> TwinOut:
                 ppfd=unit.zone.ppfd,
             ),
         ))
-    return TwinOut(sim=True, sim_time_s=t, reservoirs=out)
+    return TwinOut(sim=True, sim_time_s=t, sim_speed=world.clock.speed, reservoirs=out)
 
 
 @router.get("/history", response_model=list[TwinSampleOut])

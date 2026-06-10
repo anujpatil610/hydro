@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     poll_seconds: int = 10
     pump_ml_per_min: float = 50.0
 
+    # Sim time-lapse: each poll advances poll_seconds * sim_speed sim-seconds.
+    # 1.0 = live; ~360 renders a 35-day grow in ~14 min. Sim mode only; restart to apply.
+    sim_speed: float = 1.0
+
     # Extra dev origins so the Vite dev server reaches the API before mDNS exists.
     cors_origins: tuple[str, ...] = (
         "http://localhost:5173",

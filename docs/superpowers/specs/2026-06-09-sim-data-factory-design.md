@@ -14,6 +14,7 @@ A headless, high-speed batch generator that drives the digital twin (Sub-project
 - **Output:** Parquet primary (`data.parquet`) + a self-describing `manifest.json` per run, optional CSV via `--csv`. A per-batch `index.json` catalogs all runs.
 - **Faults:** named scenario presets (including a `clean` baseline) for labeled fault classes, plus a `random` density-driven injector for volume — both seeded/reproducible.
 - **Sweeps:** one `BatchConfig` expands `seeds × scenarios` into N runs; single run is the N=1 case. Seeds via NumPy `SeedSequence.spawn()` for collision-safe parallelism.
+- **Seed diversity (`ic_jitter`):** the seed perturbs each grow's *initial conditions* (starting nutrient mix, transplant size, buffer capacity, zone setpoint, pH) within realistic batch-to-batch ranges, so a `seeds × scenarios` sweep yields genuinely distinct labeled *trajectories* — not just N noisy replicates of one grow per scenario. Default `ic_jitter=0.12` (recorded per run in the manifest); `0` reproduces a single deterministic trajectory. Implemented in Sub-project A's `build_world` (opt-in; A's live mode leaves it at `0`).
 - **Headless:** drives `World` directly; no FastAPI, no SQLite, no HAL drivers. Reuses A's `World`, `build_world`, `NoiseModel`, `Fault` unchanged.
 
 ## Architecture & components

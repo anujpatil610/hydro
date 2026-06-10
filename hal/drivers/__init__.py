@@ -11,8 +11,9 @@ from hal.drivers import (  # noqa: F401  (registration side effects)
     generic_mock,  # noqa: F401
     ph,
     pump,
+    sim_drivers,
     tds,
     temp,
 )
 
-__all__ = ["generic_mock", "ph", "pump", "tds", "temp"]
+__all__ = ["generic_mock", "ph", "pump", "sim_drivers", "tds", "temp"]

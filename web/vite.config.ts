@@ -10,6 +10,7 @@ export default defineConfig({
       "/health": "http://localhost:8000",
       "/sensors": "http://localhost:8000",
       "/actuators": "http://localhost:8000",
+      "/twin": "http://localhost:8000",
     },
   },
   build: {

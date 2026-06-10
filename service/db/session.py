@@ -7,7 +7,7 @@ from datetime import timedelta
 from sqlalchemy import Engine, text
 from sqlmodel import Session, SQLModel, col, create_engine, delete, select
 
-from service.db.models import Reading, naive_utc
+from service.db.models import Reading, TwinSample, naive_utc
 
 # Columns added in Phase 2; absent from a Phase-1 hydro.db.
 _ADDED_COLUMNS: dict[str, str] = {
@@ -54,7 +54,9 @@ def prune_old(session: Session, retention_hours: int) -> int:
     """Delete readings older than the retention window. Returns rows removed."""
     cutoff = naive_utc() - timedelta(hours=retention_hours)
     result = session.exec(delete(Reading).where(col(Reading.timestamp) < cutoff))
-    return int(result.rowcount or 0)
+    removed = int(result.rowcount or 0)
+    twin_result = session.exec(delete(TwinSample).where(col(TwinSample.timestamp) < cutoff))
+    return removed + int(twin_result.rowcount or 0)
 
 
 def latest_per_device(session: Session) -> list[Reading]:
@@ -82,4 +84,15 @@ def history(session: Session, hours: int, device_id: str | None = None) -> list[
     if device_id is not None:
         stmt = stmt.where(col(Reading.device_id) == device_id)
     stmt = stmt.order_by(col(Reading.timestamp).asc())
+    return list(session.exec(stmt).all())
+
+
+def twin_history(
+    session: Session, hours: int, reservoir_id: str | None = None
+) -> list[TwinSample]:
+    cutoff = naive_utc() - timedelta(hours=hours)
+    stmt = select(TwinSample).where(col(TwinSample.timestamp) >= cutoff)
+    if reservoir_id is not None:
+        stmt = stmt.where(col(TwinSample.reservoir_id) == reservoir_id)
+    stmt = stmt.order_by(col(TwinSample.timestamp).asc())
     return list(session.exec(stmt).all())

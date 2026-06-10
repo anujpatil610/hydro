@@ -18,7 +18,7 @@ from hal.device_set import DeviceSet
 from sqlalchemy import Engine
 from sqlmodel import Session
 
-from service.db.models import Reading
+from service.db.models import Reading, TwinSample, naive_utc, npk_mg_l
 from service.db.session import prune_old
 from service.profile.loader import zone_of
 
@@ -39,6 +39,11 @@ class Poller:
         """Read all sensors, persist one row each, prune. Returns rows written."""
         profile = self._ds.profile
         items = self._ds.sensor_items()
+
+        # Sim mode: advance the closed-loop World one interval before reading so
+        # a live HYDRO_MODE=sim service grows in real time (no-op otherwise).
+        if self._ds.world is not None:
+            self._ds.world.step()
 
         # Read temperatures first so TDS sensors can compensate against their
         # reservoir's water temp (real mode); mock ignores this harmlessly.
@@ -68,12 +73,39 @@ class Poller:
             for dev, _ in items
             if dev.id in readings
         ]
+        twin_rows = self._twin_rows()
         with Session(self._engine) as session:
             session.add_all(rows)
+            session.add_all(twin_rows)
             session.commit()
             prune_old(session, self._retention_hours)
             session.commit()
         return rows
+
+    def _twin_rows(self) -> list[TwinSample]:
+        """Sim mode: one ground-truth TwinSample per reservoir (empty otherwise)."""
+        if self._ds.world is None:
+            return []
+        from hal.drivers.sim_drivers import noise_for_world
+
+        world = self._ds.world
+        noise = noise_for_world(world)
+        faults = ",".join(noise.active_faults(world.clock.sim_time_s)) if noise else ""
+        now = naive_utc()
+        twin_rows: list[TwinSample] = []
+        for rid in world.units:
+            snap = world.snapshot(rid)
+            n_mg_l, p_mg_l, k_mg_l = npk_mg_l(snap)
+            twin_rows.append(TwinSample(
+                timestamp=now, reservoir_id=rid,
+                stage=str(snap["stage"]),
+                biomass_g=float(snap["biomass_g"]), health=float(snap["health"]),
+                ph_true=float(snap["ph_true"]), ec_true=float(snap["ec_true"]),
+                temp_true=float(snap["temp_true"]), volume_l=float(snap["volume_l"]),
+                n_mg_l=n_mg_l, p_mg_l=p_mg_l, k_mg_l=k_mg_l,
+                faults=faults,
+            ))
+        return twin_rows
 
     def _read(self, sensor: Sensor, device_id: str) -> HalReading | None:
         """Read one sensor; a raising sensor is logged and skipped (Risk 5)."""

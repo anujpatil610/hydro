@@ -8,12 +8,16 @@ device counts come from the profile and nothing hardcodes "3 sensors + 1 pump".
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from service.profile.loader import zone_of
 from service.profile.schema import Device, ProfileFile
 
 from hal.base import Sensor
 from hal.drivers.mock_state import ReservoirState
+
+if TYPE_CHECKING:
+    from hal.sim.world import World
 
 # A constructed device is a Sensor or an actuator (Pump / MockActuator).
 Device_T = object
@@ -24,6 +28,9 @@ class DeviceSet:
     profile: ProfileFile
     devices: dict[str, object]
     reservoir_state: ReservoirState
+    # Set only in sim mode: the closed-loop World backing the sim drivers. The
+    # poller advances it each tick so a live sim grows in real time.
+    world: World | None = None
 
     def by_id(self, device_id: str) -> object:
         try:

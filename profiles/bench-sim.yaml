@@ -1,0 +1,29 @@
+# Dev bench, sim mode — drives the mechanistic digital twin (HYDRO_MODE=sim).
+# Same topology as bench.yaml but every device uses the `sim` driver/mode so the
+# closed-loop World backs the sensors and the pump doses into it.
+profile:
+  id: bench-sim-01
+  name: "Dev Bench (sim)"
+  tier: bench
+  mode_default: sim
+  retention_hours: 24
+  poll_seconds: 10
+
+crops:
+  lettuce:
+    bands:
+      ph:   { min: 5.5, max: 6.5 }
+      tds:  { min: 800, max: 1200 }
+      temp: { min: 18,  max: 24 }
+
+reservoirs:
+  - { id: resA, volume_l: 20, zone: zoneA }
+
+zones:
+  - { id: zoneA, crop: lettuce, reservoir: resA, racks: [] }
+
+devices:
+  - { id: ph_resA,   kind: ph,   driver: sim, role: monitor,       reservoir: resA }
+  - { id: tds_resA,  kind: tds,  driver: sim, role: monitor,       reservoir: resA }
+  - { id: temp_resA, kind: temp, driver: sim, role: monitor,       reservoir: resA }
+  - { id: pump_resA, kind: pump, driver: sim, role: dose-nutrient, reservoir: resA, spec: { ml_per_min: 50 } }

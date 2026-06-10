@@ -123,7 +123,7 @@ def build_row(world: World, noise: NoiseModel, *, run_id: str, reservoir_id: str
         # dosing events are wired in a later task (see plan "Out of scope").
         "dosed_ml": 0.0,
         "dose_role": "",
-        "stage_transition": progress <= step_progress,
+        "stage_transition": stage_span_days > 0 and progress <= step_progress,
         "light_on": u.zone.light_on(t),
         "air_temp_c": u.zone.air_temp_c(t),
     }

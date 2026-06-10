@@ -45,7 +45,8 @@ def _run_task(args: tuple[int, RunConfig, str, str, str, float, bool]) -> dict[s
     try:
         res = run_one(rc, out_dir=out_dir, created_at=created_at, git_commit=git_commit,
                       emit_csv=emit_csv, density=density, run_id=name)
-        return {"dir": name, "seed": rc.seed, "scenario": rc.scenario,
+        return {"dir": name, "manifest": f"{name}/manifest.json",
+                "seed": rc.seed, "scenario": rc.scenario,
                 "row_count": res["row_count"], "status": "ok"}
     except Exception as exc:  # noqa: BLE001 — one bad run must not sink the batch
         log.exception("run %s failed", name)

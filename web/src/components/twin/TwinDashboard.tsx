@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import type { Reading, Topology } from "../../lib/schema";
 import { type Twin, type TwinSample, twinApi } from "../../lib/twin";
 import { useInterval } from "../../lib/useInterval";
+import { EventTimeline } from "./EventTimeline";
 import { GrowthTimeline } from "./GrowthTimeline";
 import { NutrientPanel } from "./NutrientPanel";
 import { PlantHero } from "./PlantHero";
+import { StressBreakdown } from "./StressBreakdown";
 import { VitalGauge } from "./VitalGauge";
 
 // Gauge ranges + optimal bands for lettuce (crop.optimal ± a tight band;
@@ -117,6 +119,10 @@ export function TwinDashboard({
             .catch(() => {});
         }}
       />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <StressBreakdown twin={res} />
+        <EventTimeline history={resHistory} />
+      </div>
     </div>
   );
 }

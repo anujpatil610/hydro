@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import type { Reading } from "../../lib/schema";
+import type { Reading, Topology } from "../../lib/schema";
 import { type Twin, type TwinSample, twinApi } from "../../lib/twin";
 import { useInterval } from "../../lib/useInterval";
 import { GrowthTimeline } from "./GrowthTimeline";
+import { NutrientPanel } from "./NutrientPanel";
 import { PlantHero } from "./PlantHero";
 import { VitalGauge } from "./VitalGauge";
 
@@ -41,7 +42,13 @@ const VITALS = [
   },
 ] as const;
 
-export function TwinDashboard({ latest }: { latest: Reading[] }) {
+export function TwinDashboard({
+  latest,
+  topology,
+}: {
+  latest: Reading[];
+  topology: Topology | null;
+}) {
   const [twin, setTwin] = useState<Twin | null>(null);
   const [history, setHistory] = useState<TwinSample[]>([]);
 
@@ -67,6 +74,13 @@ export function TwinDashboard({ latest }: { latest: Reading[] }) {
     return map;
   }, [latest, res?.reservoir_id]);
 
+  const doseDeviceId = useMemo(() => {
+    const pumps = topology?.devices.filter(
+      (d) => d.kind === "pump" && d.reservoir === res?.reservoir_id,
+    );
+    return pumps?.find((d) => d.role === "dose-nutrient")?.id ?? pumps?.[0]?.id ?? null;
+  }, [topology, res?.reservoir_id]);
+
   if (!res) return <p className="text-sm text-slate-500">Twin state loading…</p>;
   const resHistory = history.filter((h) => h.reservoir_id === res.reservoir_id);
 
@@ -84,11 +98,35 @@ export function TwinDashboard({ latest }: { latest: Reading[] }) {
             bandMin={v.bandMin}
             bandMax={v.bandMax}
             trueValue={v.true(res)}
-            observed={observedByKind.get(v.key)}
+            observed={observedFor(v.key, observedByKind)}
           />
         ))}
       </div>
       <GrowthTimeline history={resHistory} />
+      <NutrientPanel
+        history={resHistory}
+        doseDeviceId={doseDeviceId}
+        onDosed={() => {
+          twinApi
+            .twin()
+            .then(setTwin)
+            .catch(() => {});
+          twinApi
+            .history(24)
+            .then(setHistory)
+            .catch(() => {});
+        }}
+      />
     </div>
   );
+}
+
+// Sim backends report kind "tds" in ppm (sim tds = ec*700 crude conversion,
+// mirrors hal/sim/drivers.py) — convert back to dS/m for the EC gauge.
+function observedFor(key: string, observedByKind: Map<string, number>): number | undefined {
+  if (key === "ec" && !observedByKind.has("ec")) {
+    const tds = observedByKind.get("tds");
+    return tds === undefined ? undefined : tds / 700;
+  }
+  return observedByKind.get(key);
 }

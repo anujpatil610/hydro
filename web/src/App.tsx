@@ -104,7 +104,7 @@ export default function App() {
       </header>
 
       {view === "twin" && hasTwin ? (
-        <TwinDashboard latest={latest} />
+        <TwinDashboard latest={latest} topology={topology} />
       ) : (
         <>
           <div className="space-y-6">

@@ -90,3 +90,50 @@ def test_run_series_rejects_unknown_column(dataset_root):
     with pytest.raises(KeyError):
         run_series(dataset_root, "smoke-batch", "run-0001_seed1_clean",
                    cols=["__import__"], stride=1)
+
+
+def test_run_series_filters_by_reservoir_id(dataset_root):
+    from service.datasets import run_series
+
+    name = "run-0042_seed4_clean"
+    rows = _rows(name, 20)
+    for i, row in enumerate(rows):
+        row["reservoir_id"] = "res-a" if i < 12 else "res-b"
+    write_run(
+        rows=rows, out_dir=dataset_root / "smoke-batch" / name,
+        manifest_extra={"run_id": name, "seed": 4, "scenario": "clean",
+                        "config": {}, "faults": [], "sim_horizon_s": 12000.0},
+        created_at="2026-06-09T00:00:00+00:00", git_commit="abc1234", emit_csv=False,
+    )
+    out = run_series(dataset_root, "smoke-batch", name,
+                     cols=["biomass_g"], stride=1, reservoir_id="res-b")
+    assert out["row_count"] == 8
+    assert out["columns"]["sim_time_s"][0] == pytest.approx(12 * 600.0)
+
+
+def test_run_series_missing_run_dir_is_none(dataset_root):
+    from service.datasets import run_series
+
+    assert run_series(dataset_root, "smoke-batch", "run-9999_seed9_clean",
+                      cols=["biomass_g"], stride=1) is None
+
+
+def test_batch_detail_unknown_batch_is_none(dataset_root):
+    from service.datasets import batch_detail
+
+    assert batch_detail(dataset_root, "no-such-batch") is None
+
+
+def test_malformed_index_does_not_raise(dataset_root):
+    from service.datasets import batch_detail, list_batches
+
+    bad = dataset_root / "bad-batch"
+    bad.mkdir()
+    (bad / "index.json").write_text(json.dumps({"runs": [{}]}))
+    batches = list_batches(dataset_root)
+    assert {"name": "bad-batch", "run_count": 0, "failed": 0,
+            "created_at": None} in batches
+    detail = batch_detail(dataset_root, "bad-batch")
+    assert detail["name"] == "bad-batch"
+    assert detail["run_count"] == 0 and detail["failed"] == 0
+    assert detail["runs"] == [{"manifest": None}]

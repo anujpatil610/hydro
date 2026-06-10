@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from hal.sim.factory.config import load_batch
@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "run":
         batch = load_batch(args.batch)
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
         index = run_batch(batch, out_root=Path(args.out), created_at=created_at,
                           git_commit=_git_commit(), workers=args.workers,
                           emit_csv=True if args.csv else None)

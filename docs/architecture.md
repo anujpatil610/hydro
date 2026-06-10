@@ -76,6 +76,16 @@ as a live control testbed (`speed=1`) and, later, a synthetic-data factory.
 Design + research: `docs/superpowers/specs/2026-06-09-digital-twin-grow-sim-design.md`.
 Run it with `HYDRO_PROFILE=profiles/bench-sim.yaml`.
 
+### Sub-project B — sim data factory
+
+`hal/sim/factory/` drives the twin headless to generate labeled datasets.
+`python -m hal.sim.factory run runs/baseline.yaml` expands a `BatchConfig`
+(`seeds × scenarios`) into N grows, each written as `data.parquet` +
+`manifest.json` under `data/datasets/<name>/`, catalogued by `index.json`. Rows
+carry the observed track (model inputs), the hidden truth track (labels), and an
+event/fault track — the contract Sub-project C trains on. Reproducible by seed,
+CPU-only. Design: `docs/superpowers/specs/2026-06-09-sim-data-factory-design.md`.
+
 ### Layer 4 — rules engine (Phase 3)
 
 Design locked in `PHASE3_PLAN.md` (defaults derived in `PHASE3_RESEARCH.md`;

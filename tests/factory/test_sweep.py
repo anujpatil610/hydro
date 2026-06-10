@@ -31,8 +31,8 @@ def test_expand_count_form_spawns_seeds():
 
 
 def test_run_batch_writes_runs_and_index(tmp_path):
-    index = run_batch(_batch(), out_root=tmp_path, created_at="t",
-                      git_commit="c", workers=1)
+    run_batch(_batch(), out_root=tmp_path, created_at="t",
+              git_commit="c", workers=1)
     ds = tmp_path / "demo"
     assert (ds / "index.json").exists()
     on_disk = json.loads((ds / "index.json").read_text())

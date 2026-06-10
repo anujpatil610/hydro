@@ -22,6 +22,9 @@ class RunConfig(_Frozen):
     speed: float = Field(default=1.0, gt=0)  # informational for batch
     seed: int = 0
     scenario: str = "clean"
+    # Seed-driven initial-condition variation so each seed is a distinct grow
+    # (not just different sensor noise). 0 = identical trajectory across seeds.
+    ic_jitter: float = Field(default=0.12, ge=0)
 
 
 class BatchConfig(_Frozen):

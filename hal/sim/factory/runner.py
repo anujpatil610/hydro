@@ -30,7 +30,8 @@ def run_one(rc: RunConfig, *, out_dir: Path, created_at: str, git_commit: str,
     profile = load_profile(rc.profile)
     world = build_world(profile, seed=rc.seed,
                         integration_step_s=rc.integration_step_s,
-                        sample_interval_s=rc.sample_interval_s)
+                        sample_interval_s=rc.sample_interval_s,
+                        ic_jitter=rc.ic_jitter)
     faults = resolve(rc.scenario, seed=rc.seed, duration_days=rc.duration_days,
                      density=density)
     noise = NoiseModel(seed=rc.seed, faults=faults)

@@ -1,10 +1,14 @@
 """Datasets fs module + API: list, detail, downsampled series."""
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from hal.sim.factory.schema import COLUMNS
 from hal.sim.factory.writer import write_run
+from service.config import Settings
+from service.main import create_app
 
 
 def _rows(run_id: str, n: int, *, biomass0: float = 0.05) -> list[dict]:
@@ -137,3 +141,59 @@ def test_malformed_index_does_not_raise(dataset_root):
     assert detail["name"] == "bad-batch"
     assert detail["run_count"] == 0 and detail["failed"] == 0
     assert detail["runs"] == [{"manifest": None}]
+
+
+def _client(tmp_path: Path, datasets_dir: Path) -> TestClient:
+    settings = Settings(
+        profile="profiles/bench.yaml",
+        db_path=str(tmp_path / "api.db"),
+        datasets_dir=str(datasets_dir),
+    )
+    return TestClient(create_app(settings, start_poller=False))
+
+
+@pytest.fixture()
+def datasets_client(tmp_path, dataset_root) -> Iterator[TestClient]:
+    with _client(tmp_path, dataset_root) as c:
+        yield c
+
+
+@pytest.fixture()
+def plain_client(tmp_path) -> Iterator[TestClient]:
+    with _client(tmp_path, tmp_path / "no-datasets") as c:
+        yield c
+
+
+def test_api_lists_batches(datasets_client):
+    body = datasets_client.get("/datasets").json()
+    assert body[0]["name"] == "smoke-batch"
+
+
+def test_api_404_when_no_datasets_dir(plain_client):
+    assert plain_client.get("/datasets").status_code == 404
+    assert plain_client.get("/datasets/anything").status_code == 404
+
+
+def test_api_batch_detail_and_unknown(datasets_client):
+    assert datasets_client.get("/datasets/smoke-batch").json()["run_count"] == 3
+    assert datasets_client.get("/datasets/nope").status_code == 404
+
+
+def test_api_series(datasets_client):
+    r = datasets_client.get(
+        "/datasets/smoke-batch/run-0001_seed1_clean/series"
+        "?cols=biomass_g,health&stride=10")
+    body = r.json()
+    assert body["row_count"] == 5
+    assert "biomass_g" in body["columns"]
+
+
+def test_api_series_validation(datasets_client):
+    base = "/datasets/smoke-batch/run-0001_seed1_clean/series"
+    assert datasets_client.get(f"{base}?cols=__bad__").status_code == 422
+    assert datasets_client.get(f"{base}?cols=biomass_g&stride=0").status_code == 422
+    assert datasets_client.get(
+        "/datasets/smoke-batch/run-none/series?cols=biomass_g").status_code == 404
+    # path traversal is rejected by the name pattern
+    assert datasets_client.get(
+        "/datasets/..%2F..%2Fetc/run/series?cols=biomass_g").status_code in (404, 422)

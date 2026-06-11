@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     db_path: str = "data/hydro.db"
     calibration_path: str = "data/calibration.json"
 
+    # Root of factory output served read-only by /datasets (404 when absent).
+    datasets_dir: str = "data/datasets"
+
     # Fallbacks used only when a profile omits them (every shipped profile sets
     # its own retention_hours / poll_seconds). ``mode`` is unused by the
     # profile path and kept for the legacy build_hal factory only.

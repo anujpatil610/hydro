@@ -33,6 +33,7 @@ export type TwinReservoir = z.infer<typeof twinReservoirSchema>;
 export const twinSchema = z.object({
   sim: z.boolean(),
   sim_time_s: z.number(),
+  sim_speed: z.number(),
   reservoirs: z.array(twinReservoirSchema),
 });
 export type Twin = z.infer<typeof twinSchema>;

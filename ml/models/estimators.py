@@ -18,7 +18,7 @@ def monotonic_cst_for(feature_names: list[str]) -> list[int]:
     return [1 if name in MONOTONE_FEATURES else 0 for name in feature_names]
 
 
-def _gbr(cfg: TrainConfig, **kw) -> HistGradientBoostingRegressor:
+def _gbr(cfg: TrainConfig, **kw: object) -> HistGradientBoostingRegressor:
     return HistGradientBoostingRegressor(
         max_iter=cfg.max_iter,
         learning_rate=cfg.learning_rate,
@@ -51,9 +51,9 @@ def build_stage(cfg: TrainConfig, feature_names: list[str]) -> HistGradientBoost
     )
 
 
-def predict_health(est: HistGradientBoostingRegressor, X) -> np.ndarray:
+def predict_health(est: HistGradientBoostingRegressor, X: np.ndarray) -> np.ndarray:
     """Health is bounded [0,1]; clip the regressor output (inference contract)."""
-    return np.clip(est.predict(X), 0.0, 1.0)
+    return np.clip(est.predict(X), 0.0, 1.0)  # type: ignore[no-any-return]
 
 
 def build_dummy_regressor() -> DummyRegressor:

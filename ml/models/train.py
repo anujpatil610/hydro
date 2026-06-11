@@ -12,10 +12,11 @@ import sys
 from dataclasses import dataclass, field
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 from ml.config import STAGE_ORDER, TrainConfig
 from ml.data.corpus import ensure_corpus
@@ -47,14 +48,21 @@ class BundleVersionError(RuntimeError):
 @dataclass
 class TrainReport:
     gate: GateResult
-    metrics: dict = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 def _Xsub(X: pd.DataFrame, subset: str) -> pd.DataFrame:
     return X[feature_columns(X, subset)]
 
 
-def _fit_reg(build, cfg, X, y, fit_idx, val_idx):
+def _fit_reg(
+    build: Any,
+    cfg: TrainConfig,
+    X: pd.DataFrame,
+    y: np.ndarray,
+    fit_idx: np.ndarray,
+    val_idx: np.ndarray,
+) -> Any:
     cols = list(X.columns)
     est = build(cfg, cols)
     est.fit(X.iloc[fit_idx].to_numpy(), y[fit_idx],
@@ -62,7 +70,7 @@ def _fit_reg(build, cfg, X, y, fit_idx, val_idx):
     return est
 
 
-def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict:
+def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     """CV out-of-fold predictions for full / time-only models + dummy, with
     per-grow NMAE overall and on fault scenarios. Returns a metrics dict."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
@@ -93,7 +101,7 @@ def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict:
     }
 
 
-def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict:
+def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = {k: np.full(len(fb.y_health), np.nan) for k in ("full", "time_only")}
     for train_idx, test_idx in folds:
@@ -119,7 +127,7 @@ def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict:
     }
 
 
-def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict:
+def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     """Stage is a sim clock; gate the SENSORS-ONLY model vs a time-only model."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = {k: np.full(len(fb.y_stage_code), -1) for k in ("with_time", "sensors", "time_only")}
@@ -147,7 +155,7 @@ def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict:
     }
 
 
-def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict:
+def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     """Biomass per-grow MAE broken out per scenario, via a single grouped CV."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = np.full(len(fb.y_biomass), np.nan)
@@ -162,7 +170,7 @@ def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict:
     return out
 
 
-def _fit_final(fb: FeatureFrame, cfg: TrainConfig):
+def _fit_final(fb: FeatureFrame, cfg: TrainConfig) -> tuple[Any, Any, Any, Any]:
     """Refit deployable models on all grows (grouped inner-val for early stop)."""
     idx = np.arange(len(fb.X))
     fit_idx, val_idx = inner_val_split(idx, fb.groups, fb.scenarios, cfg)
@@ -178,7 +186,7 @@ def _fit_final(fb: FeatureFrame, cfg: TrainConfig):
     return biomass, health, stage, dummy
 
 
-def _versions() -> dict:
+def _versions() -> dict[str, str]:
     return {
         "python": sys.version.split()[0],
         "scikit_learn": version("scikit-learn"),
@@ -193,7 +201,7 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _json_safe(obj):
+def _json_safe(obj: Any) -> Any:
     """Replace non-finite floats (nan/inf) with None so artifacts are valid JSON."""
     if isinstance(obj, float):
         return obj if math.isfinite(obj) else None
@@ -278,7 +286,7 @@ def train_all(
     return TrainReport(gate=gate, metrics=metrics)
 
 
-def _render_report(metrics: dict, gate: GateResult) -> str:
+def _render_report(metrics: dict[str, Any], gate: GateResult) -> str:
     lines = ["# ML state-estimation — training report", ""]
     lines.append(
         f"**Gate: {'PASS' if gate.passed else 'FAIL'}**  "
@@ -299,7 +307,7 @@ def _render_report(metrics: dict, gate: GateResult) -> str:
     return "\n".join(lines) + "\n"
 
 
-def load_bundle(path: str, *, strict: bool = True) -> dict:
+def load_bundle(path: str, *, strict: bool = True) -> dict[str, Any]:
     """Load a saved bundle, checking the recorded library versions against the
     runtime (a same-process round-trip can't catch the cross-version drift the
     Pi will hit). Raises BundleVersionError on mismatch when strict.

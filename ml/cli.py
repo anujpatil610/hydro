@@ -10,6 +10,7 @@ import os
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from ml.config import CORPUS_CONFIG, CORPUS_ROOT, TrainConfig
 from ml.data.corpus import ensure_corpus
@@ -24,8 +25,8 @@ def _git_commit() -> str:
         return "unknown"
 
 
-def _config_from_args(args) -> TrainConfig:
-    kw: dict = {}
+def _config_from_args(args: argparse.Namespace) -> TrainConfig:
+    kw: dict[str, Any] = {}
     if args.n_splits is not None:
         kw["n_splits"] = args.n_splits
     if args.max_iter is not None:

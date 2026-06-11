@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 from ml.config import OBSERVED_COLS, STAGE_TO_CODE, TrainConfig
 from ml.data.loading import Grow

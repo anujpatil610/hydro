@@ -1,6 +1,8 @@
 """Training harness: corpus -> features -> grouped CV -> fit (explicit-val early
-stopping) -> per-grow + ablation + robustness + LOSO evaluation -> save and
-validate a reproducible joblib bundle. Wall-clock/thread inputs are passed in."""
+stopping) -> per-grow CV evaluation (full / time-only / sensors-only ablation for
+the gate) + acceptance gate + reproducible bundle.
+Robustness-perturbation execution and a LOSO report are deferred follow-ons (the
+`perturb_observed` helper exists, unwired). Wall-clock/thread inputs are passed in."""
 
 from __future__ import annotations
 
@@ -36,9 +38,9 @@ from ml.models.estimators import (
 from ml.models.evaluate import (
     GateResult,
     adjacent_accuracy,
-    nmae,
     ordinal_mae,
     per_grow_mae,
+    per_grow_nmae,
     quadratic_weighted_kappa,
     run_gate,
 )
@@ -46,6 +48,10 @@ from ml.models.evaluate import (
 
 class BundleVersionError(RuntimeError):
     """A saved bundle's recorded library versions differ from the runtime."""
+
+
+class BundleIntegrityError(RuntimeError):
+    """A bundle file's sha256 does not match the manifest (tampered/corrupt)."""
 
 
 @dataclass
@@ -96,11 +102,11 @@ def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, float]:
     yt = fb.y_biomass
     return {
         "mae_full": per_grow_mae(yt, oof["full"], fb.groups),
-        "nmae_full": nmae(yt, oof["full"]),
-        "nmae_time_only": nmae(yt, oof["time_only"]),
-        "nmae_dummy": nmae(yt, oof["dummy"]),
-        "nmae_full_fault": nmae(yt[fault], oof["full"][fault]),
-        "nmae_time_only_fault": nmae(yt[fault], oof["time_only"][fault]),
+        "nmae_full": per_grow_nmae(yt, oof["full"], fb.groups),
+        "nmae_time_only": per_grow_nmae(yt, oof["time_only"], fb.groups),
+        "nmae_dummy": per_grow_nmae(yt, oof["dummy"], fb.groups),
+        "nmae_full_fault": per_grow_nmae(yt[fault], oof["full"][fault], fb.groups[fault]),
+        "nmae_time_only_fault": per_grow_nmae(yt[fault], oof["time_only"][fault], fb.groups[fault]),
     }
 
 
@@ -123,10 +129,10 @@ def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, float]:
     fault = fb.scenarios != "clean"
     return {
         "mae_full": per_grow_mae(yt, oof["full"], fb.groups),
-        "nmae_full": nmae(yt, oof["full"]),
-        "nmae_time_only": nmae(yt, oof["time_only"]),
-        "nmae_full_fault": nmae(yt[fault], oof["full"][fault]),
-        "nmae_time_only_fault": nmae(yt[fault], oof["time_only"][fault]),
+        "nmae_full": per_grow_nmae(yt, oof["full"], fb.groups),
+        "nmae_time_only": per_grow_nmae(yt, oof["time_only"], fb.groups),
+        "nmae_full_fault": per_grow_nmae(yt[fault], oof["full"][fault], fb.groups[fault]),
+        "nmae_time_only_fault": per_grow_nmae(yt[fault], oof["time_only"][fault], fb.groups[fault]),
     }
 
 
@@ -280,6 +286,10 @@ def train_all(
             "baselines.joblib", "preprocessor.joblib",
         )
     }
+    fold_of: dict[str, int] = {}
+    for fi, (_, test_idx) in enumerate(make_cv_folds(fb.groups, fb.scenarios, config)):
+        for rid in set(fb.groups[test_idx]):
+            fold_of[str(rid)] = fi
     manifest = {
         "schema_version": "1.0",
         "created_at": created_at,
@@ -291,6 +301,12 @@ def train_all(
         "feature_names": feature_names,
         "sha256": sha,
         "n_grows": len(grows),
+        "corpus": {
+            "root": str(corpus_root),
+            "index_sha256": _sha256(Path(corpus_root) / "index.json"),
+            "n_grows": len(grows),
+        },
+        "folds": fold_of,
     }
     (out / "manifest.json").write_text(json.dumps(_json_safe(manifest), indent=2, default=str))
     return TrainReport(gate=gate, metrics=metrics)
@@ -327,6 +343,12 @@ def load_bundle(path: str, *, strict: bool = True) -> dict[str, Any]:
     """
     p = Path(path)
     manifest = json.loads((p / "manifest.json").read_text())
+    for fname, expected in manifest.get("sha256", {}).items():
+        actual = _sha256(p / fname)
+        if actual != expected:
+            raise BundleIntegrityError(
+                f"{fname}: sha256 mismatch (manifest {expected[:12]}..., disk {actual[:12]}...)"
+            )
     current = _versions()
     drift = {
         k: (manifest["versions"].get(k), current[k])

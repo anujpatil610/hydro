@@ -31,6 +31,16 @@ def nmae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return mae / iqr if iqr > 0 else float("inf")
 
 
+def per_grow_nmae(y_true: np.ndarray, y_pred: np.ndarray, groups: np.ndarray) -> float:
+    """Per-grow macro-averaged MAE normalized by the population IQR — scale-free
+    and per-grow (consistent with per_grow_mae; not row-pooled)."""
+    q75, q25 = np.percentile(y_true, [75, 25])
+    iqr = float(q75 - q25)
+    if iqr <= 0:
+        return float("inf")
+    return per_grow_mae(y_true, y_pred, groups) / iqr
+
+
 def quadratic_weighted_kappa(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(cohen_kappa_score(y_true, y_pred, weights="quadratic", labels=[0, 1, 2, 3]))
 

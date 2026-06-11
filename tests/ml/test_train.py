@@ -59,6 +59,19 @@ def test_artifact_round_trips_identically(trained):
     assert np.array_equal(model.predict(X), model.predict(X))
 
 
+def test_load_bundle_rejects_tampered_joblib(trained, tmp_path):
+    import shutil
+
+    from ml.models.train import BundleIntegrityError
+
+    out, _ = trained
+    dst = tmp_path / "bundle"
+    shutil.copytree(out, dst)
+    (dst / "biomass.joblib").write_bytes((dst / "biomass.joblib").read_bytes() + b"x")
+    with pytest.raises(BundleIntegrityError, match="sha256"):
+        load_bundle(str(dst), strict=True)
+
+
 def test_load_bundle_rejects_version_mismatch(trained, tmp_path):
     import shutil
 

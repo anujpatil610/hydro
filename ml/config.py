@@ -66,4 +66,6 @@ class TrainConfig:
     stage_qwk_sensors_min: float = 0.60
     stage_qwk_margin: float = 0.10
     stage_adjacent_acc_min: float = 0.90
-    robustness_max_mae_ratio: float = 2.0  # flag if biomass MAE >2x under 1x-noise + drift
+    # reserved for the deferred robustness-perturbation report
+    # (perturb_observed is built but unwired)
+    robustness_max_mae_ratio: float = 2.0

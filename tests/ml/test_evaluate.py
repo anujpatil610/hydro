@@ -8,6 +8,7 @@ from ml.models.evaluate import (
     nmae,
     ordinal_mae,
     per_grow_mae,
+    per_grow_nmae,
     perturb_observed,
     quadratic_weighted_kappa,
     run_gate,
@@ -27,6 +28,16 @@ def test_nmae_normalizes_by_iqr():
     y = np.array([0.0, 1.0, 2.0, 3.0, 4.0])  # IQR = 2.0
     pred = y + 1.0  # MAE = 1.0
     assert abs(nmae(y, pred) - 0.5) < 1e-9
+
+
+def test_per_grow_nmae_uses_per_grow_mae_over_iqr():
+    groups = np.array(["A"] * 100 + ["B"])
+    y_true = np.array([0.0, 4.0] * 50 + [2.0])  # IQR = 4.0
+    y_pred = y_true.copy()
+    y_pred[:100] += 1.0   # grow A err 1.0
+    y_pred[100] += 9.0    # grow B err 9.0
+    # per-grow MAE = mean(1.0, 9.0) = 5.0 ; / IQR 4.0 = 1.25
+    assert abs(per_grow_nmae(y_true, y_pred, groups) - 1.25) < 1e-9
 
 
 def test_quadratic_weighted_kappa_penalizes_distant_errors():

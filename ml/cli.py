@@ -80,9 +80,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if (args.strict and not report.gate.passed) else 0
 
     if args.cmd == "evaluate":
+        from ml.models.train import load_bundle
+
+        load_bundle(args.artifacts, strict=True)  # integrity + version check
         metrics = json.loads((Path(args.artifacts) / "metrics.json").read_text())
         gate = metrics["gate"]
-        print(f"gate: {'PASS' if gate['passed'] else 'FAIL'}")
+        print(f"gate: {'PASS' if gate['passed'] else 'FAIL'} (bundle verified)")
         for k, v in gate["criteria"].items():
             print(f"  {k}: {'PASS' if v else 'FAIL'}")
         return 0

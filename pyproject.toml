@@ -80,6 +80,7 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Numeric/ML stack ships no/partial type stubs — relax import typing only here.
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "joblib.*"]
+module = ["sklearn.*", "joblib.*", "pandas.*", "scipy.*"]
 ignore_missing_imports = true

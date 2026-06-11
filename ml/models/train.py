@@ -16,7 +16,7 @@ from typing import Any
 
 import joblib
 import numpy as np
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 
 from ml.config import STAGE_ORDER, TrainConfig
 from ml.data.corpus import ensure_corpus

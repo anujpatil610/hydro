@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 from sklearn.metrics import cohen_kappa_score
 
 from ml.config import OBSERVED_COLS, TrainConfig
@@ -85,7 +85,9 @@ class GateResult:
     detail: dict[str, Any]
 
 
-def run_gate(cfg: TrainConfig, *, biomass: dict[str, Any], health: dict[str, Any], stage: dict[str, Any]) -> GateResult:
+def run_gate(
+    cfg: TrainConfig, *, biomass: dict[str, Any], health: dict[str, Any], stage: dict[str, Any]
+) -> GateResult:
     """Criterion 1 (binding): each GBT beats both its dummy and the time-only
     model by the margin (biomass/health on fault scenarios); stage sensors-only
     beats time-only QWK by margin with adjacent-acc floor. Criterion 2 is advisory."""

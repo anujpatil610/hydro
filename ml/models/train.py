@@ -275,6 +275,8 @@ def robustness_report(grows: list[Grow], config: TrainConfig) -> dict[str, Any]:
         base.update(_per_grow_mae_dict(
             tfb.y_biomass, model.predict(_Xsub(tfb.X, "full").to_numpy()), tfb.groups))
         for level in ROBUSTNESS_LEVELS:
+            # perturb_observed touches only sensor columns, so the true biomass
+            # labels are unchanged — this measures INPUT (feature) sensitivity.
             pfb = build_features(_perturb_grows(test_grows, level, config.seed), config)
             lvl[str(level["name"])].update(_per_grow_mae_dict(
                 pfb.y_biomass, model.predict(_Xsub(pfb.X, "full").to_numpy()), pfb.groups))

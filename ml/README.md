@@ -25,5 +25,7 @@ the *sensors* carry recoverable state. See
 `artifacts/<id>/`: `biomass|health|stage.joblib`, `preprocessor.joblib`
 (feature names/order, windows, stage order, clip), `metrics.json`, `report.md`,
 `manifest.json` (versions/arch/OMP threads/sha256 — `load_bundle` checks them).
+`metrics.json` and `report.md` include `ablation`, `robustness`, and `loso` sections
+when `run_eval_extras=True` (the default).
 Deferred to follow-on: quantile intervals, classifier calibration, ONNX/skops,
 corpus-side domain randomization, Pi deployment (C1-deploy).

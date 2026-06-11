@@ -219,7 +219,7 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 
 | # | Gap | In-scope-now mitigation | Follow-on |
 |---|---|---|---|
-| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | `perturb_observed` helper built + unit-tested (execution deferred — see Out of scope) | Wire the robustness report; corpus-side domain randomization of noise/offset/gain |
+| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | Robustness-perturbation report (advisory `robustness_ok` flag) — shipped | Corpus-side domain randomization of noise/offset/gain |
 | 2 | **Calibration/units gap** — real `ph_obs`/`ec_obs` need per-probe calibration | Preprocessor documents expected units/ranges; manifest records them | Per-probe calibration step at deploy |
 | 3 | **Unmodeled real dynamics** — cultivar, light spectrum, disease absent from the ODE | LOSO report flags regime sensitivity | Expand the twin / collect real edge cases |
 | 4 | **Covariate shift** detectable at deploy | — | Two-sample / domain-classifier shift check (real feature dist vs. corpus) before trusting predictions |
@@ -236,10 +236,9 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 - **Corpus-side domain randomization** of sensor parameters — deferred (touches B's factory); risk #1 above.
 - Online/incremental learning; the corpus is generated once and trained offline.
 
-**Deferred during implementation → follow-on "C1-eval-extras" (the first slice builds the binding gate; these are the spec's flagged/informational extras):**
-- **Robustness-perturbation report (gate criterion 4)** — `perturb_observed` is built and unit-tested but **not yet wired** into `train_all`/`evaluate`; the degradation curve and the `robustness_max_mae_ratio` flag are pending. This is the flagship transfer check and the top of the C1-eval-extras follow-on.
-- **Leave-one-scenario-out (LOSO)** report and the **full ablation table** — the gate uses the time-only baseline (the binding bar) and computes the dummy floor and sensors-only stage model; not yet emitted are the per-target **sensors-only biomass** variant, an explicit **dummy-vs-GBT** gate check, and the consolidated full/sensors-only/time-only/LOSO table in `metrics.json`/`report.md`.
-- **Manifest extras** — feature-name-list sha256 and an embedded `requirements.lock` (the versions block already pins the inference-critical libraries).
+**Shipped after the first slice (run when `run_eval_extras=True`, the default):** the full ablation table (full / sensors-only / time-only / dummy per target), the robustness-perturbation report (biomass MAE degradation across noise/offset/gain levels, surfaced as an advisory non-binding `robustness_ok` gate flag), and the leave-one-scenario-out (LOSO) report.
+
+**Still deferred (follow-on):** a separate feature-name-list sha256 and an embedded `requirements.lock` in the manifest (the versions block already pins the inference-critical libraries); corpus-side domain randomization; quantile intervals; classifier calibration; ONNX/skops; Pi deployment (C1-deploy).
 
 ## Testing
 

@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from ml.data.corpus import CorpusError, ensure_corpus
 
 
@@ -30,6 +31,19 @@ def test_ensure_corpus_generates_then_reuses(tmp_path):
     p2 = ensure_corpus(str(root), config_path=str(cfg), created_at="t2", git_commit="c2")
     assert p2 == root
     assert (root / "index.json").stat().st_mtime_ns == mtime1
+
+
+def test_ensure_corpus_regenerate_overwrites_broken_corpus(tmp_path):
+    cfg = tmp_path / "tiny.yaml"
+    _write_tiny_config(cfg)
+    root = tmp_path / "out" / "tiny"
+    ensure_corpus(str(root), config_path=str(cfg), created_at="t", git_commit="c")
+    # corrupt the index, then force regeneration
+    (root / "index.json").write_text(json.dumps({"name": "tiny", "failed": 1, "runs": []}))
+    p = ensure_corpus(str(root), config_path=str(cfg), regenerate=True,
+                      created_at="t", git_commit="c")
+    assert p == root
+    assert json.loads((root / "index.json").read_text())["failed"] == 0
 
 
 def test_ensure_corpus_rejects_failed_runs(tmp_path):

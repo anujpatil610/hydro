@@ -47,7 +47,8 @@ def ensure_corpus(
     git_commit: str,
     workers: int | None = None,
 ) -> Path:
-    """Return the corpus dir, generating it from `config_path` only when no index.json exists.
+    """Return the corpus dir, generating it only when ``index.json`` is absent
+    or ``regenerate=True``.
 
     If index.json already exists (even with failures), validate it and raise
     CorpusError rather than silently regenerating — the caller must pass
@@ -65,6 +66,11 @@ def ensure_corpus(
     index = run_batch(batch, out_root=out_root, created_at=created_at,
                       git_commit=git_commit, workers=workers)
     produced = out_root / batch.name
+    if produced != root_p:
+        raise CorpusError(
+            f"batch name {batch.name!r} writes {produced}, which does not match "
+            f"requested root {root_p}; set the config's name to {root_p.name!r} or fix root"
+        )
     if index["failed"]:
         raise CorpusError(
             f"corpus generation produced {index['failed']} failed run(s) -> {produced}"

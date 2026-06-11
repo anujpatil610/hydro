@@ -65,10 +65,25 @@ def test_run_gate_flags_when_model_does_not_beat_time_only():
         cfg,
         biomass={"nmae_full": 0.10, "nmae_time_only": 0.10, "nmae_dummy": 0.5,
                  "nmae_full_fault": 0.10, "nmae_time_only_fault": 0.10},
-        health={"mae_full": 0.05, "nmae_time_only": 0.4, "nmae_full": 0.1},
+        health={"mae_full": 0.05, "nmae_full_fault": 0.1, "nmae_time_only_fault": 0.4},
         stage={"qwk_with_time": 0.99, "qwk_sensors": 0.7, "qwk_time_only": 0.65,
                "adjacent_acc_sensors": 0.95},
     )
     assert isinstance(res, GateResult)
     assert res.criteria["biomass_beats_time_only"] is False
     assert res.passed is False
+
+
+def test_run_gate_passes_when_all_binding_criteria_met():
+    cfg = TrainConfig()
+    res = run_gate(
+        cfg,
+        biomass={"nmae_full": 0.10, "nmae_time_only": 0.5, "nmae_dummy": 0.8,
+                 "nmae_full_fault": 0.10, "nmae_time_only_fault": 0.5},
+        health={"mae_full": 0.05, "nmae_full_fault": 0.1, "nmae_time_only_fault": 0.5},
+        stage={"qwk_with_time": 0.99, "qwk_sensors": 0.85, "qwk_time_only": 0.6,
+               "adjacent_acc_sensors": 0.95},
+    )
+    assert res.passed is True
+    assert all(res.criteria[k] for k in
+               ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only"))

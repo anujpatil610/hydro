@@ -42,10 +42,11 @@ def ordinal_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.abs(y_true.astype(float) - y_pred.astype(float)).mean())
 
 
-def health_reliability(y_true: np.ndarray, y_pred: np.ndarray, bins: int = 10) -> dict:
+def health_reliability(y_true: np.ndarray, y_pred: np.ndarray, bins: int = 10) -> dict[str, float]:
     """Binned predicted-vs-true reliability + signed bias (catches a model that
     regresses to the mean and never flags an unhealthy grow)."""
     edges = np.linspace(0.0, 1.0, bins + 1)
+    # pred == 1.0 lands in bin `bins` before the clip pulls it back to bins-1
     idx = np.clip(np.digitize(y_pred, edges) - 1, 0, bins - 1)
     gaps = []
     for b in range(bins):
@@ -68,6 +69,8 @@ def perturb_observed(
     out["ph_obs"] = out["ph_obs"] + ph_offset
     out["ec_obs"] = out["ec_obs"] * ec_gain
     out["tds_obs"] = out["tds_obs"] * ec_gain
+    # temp_obs (digital DS18B20) takes no calibration drift — only noise below;
+    # pH offset + EC/TDS gain model the analog-probe reality gap.
     if noise_sigma > 0:
         for c in OBSERVED_COLS:
             out[c] = out[c] + rng.normal(0.0, noise_sigma, size=len(out))
@@ -84,7 +87,7 @@ class GateResult:
 def run_gate(cfg: TrainConfig, *, biomass: dict, health: dict, stage: dict) -> GateResult:
     """Criterion 1 (binding): each GBT beats both its dummy and the time-only
     model by the margin (biomass/health on fault scenarios); stage sensors-only
-    beats time-only QWK by margin with adjacent-acc floor. Criteria 2-3 advisory."""
+    beats time-only QWK by margin with adjacent-acc floor. Criterion 2 is advisory."""
     c: dict[str, bool] = {}
 
     # criterion 1 — sensors carry signal
@@ -92,7 +95,7 @@ def run_gate(cfg: TrainConfig, *, biomass: dict, health: dict, stage: dict) -> G
         biomass["nmae_full_fault"] <= biomass["nmae_time_only_fault"] * (1 - cfg.beat_margin)
     )
     c["health_beats_time_only"] = (
-        health["nmae_full"] <= health["nmae_time_only"] * (1 - cfg.beat_margin)
+        health["nmae_full_fault"] <= health["nmae_time_only_fault"] * (1 - cfg.beat_margin)
     )
     c["stage_beats_time_only"] = (
         stage["qwk_sensors"] >= stage["qwk_time_only"] + cfg.stage_qwk_margin

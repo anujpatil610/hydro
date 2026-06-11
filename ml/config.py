@@ -69,3 +69,4 @@ class TrainConfig:
     # reserved for the deferred robustness-perturbation report
     # (perturb_observed is built but unwired)
     robustness_max_mae_ratio: float = 2.0
+    run_eval_extras: bool = True  # ablation / robustness / LOSO (off in fast tests)

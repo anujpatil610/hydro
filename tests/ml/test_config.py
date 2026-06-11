@@ -35,3 +35,7 @@ def test_train_config_defaults():
     assert c.n_splits == 5
     assert c.max_iter == 300
     assert 0 < c.val_fraction < 1
+
+
+def test_run_eval_extras_defaults_true():
+    assert TrainConfig().run_eval_extras is True

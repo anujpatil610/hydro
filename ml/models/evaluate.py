@@ -13,6 +13,18 @@ from sklearn.metrics import cohen_kappa_score
 
 from ml.config import OBSERVED_COLS, TrainConfig
 
+# Inference-time perturbations for the robustness report (observed sensors only).
+# noise_sigma is absolute, applied to all four observed channels; ph_offset is a
+# pH calibration offset; ec_gain scales ec_obs/tds_obs. "combined" is the level
+# the non-binding gate flag checks (1x-ish noise + small calibration drift).
+ROBUSTNESS_LEVELS = [
+    {"name": "noise_low", "noise_sigma": 0.02, "ph_offset": 0.0, "ec_gain": 1.0},
+    {"name": "noise_high", "noise_sigma": 0.05, "ph_offset": 0.0, "ec_gain": 1.0},
+    {"name": "ph_offset", "noise_sigma": 0.0, "ph_offset": 0.3, "ec_gain": 1.0},
+    {"name": "ec_gain", "noise_sigma": 0.0, "ph_offset": 0.0, "ec_gain": 1.08},
+    {"name": "combined", "noise_sigma": 0.02, "ph_offset": 0.2, "ec_gain": 1.05},
+]
+
 
 def per_grow_mae(y_true: np.ndarray, y_pred: np.ndarray, groups: np.ndarray) -> float:
     """Mean over grows of each grow's MAE (rows within a grow are autocorrelated;

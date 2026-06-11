@@ -98,3 +98,12 @@ def test_run_gate_passes_when_all_binding_criteria_met():
     assert res.passed is True
     assert all(res.criteria[k] for k in
                ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only"))
+
+
+def test_robustness_levels_have_a_combined_flag_level():
+    from ml.models.evaluate import ROBUSTNESS_LEVELS
+
+    names = {lv["name"] for lv in ROBUSTNESS_LEVELS}
+    assert "combined" in names
+    for lv in ROBUSTNESS_LEVELS:
+        assert {"name", "noise_sigma", "ph_offset", "ec_gain"} <= lv.keys()

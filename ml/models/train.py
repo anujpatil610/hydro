@@ -9,6 +9,7 @@ import json
 import math
 import platform
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib.metadata import version
 from pathlib import Path
@@ -17,6 +18,8 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.dummy import DummyRegressor
+from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 
 from ml.config import STAGE_ORDER, TrainConfig
 from ml.data.corpus import ensure_corpus
@@ -56,13 +59,13 @@ def _Xsub(X: pd.DataFrame, subset: str) -> pd.DataFrame:
 
 
 def _fit_reg(
-    build: Any,
+    build: Callable[[TrainConfig, list[str]], HistGradientBoostingRegressor],
     cfg: TrainConfig,
     X: pd.DataFrame,
     y: np.ndarray,
     fit_idx: np.ndarray,
     val_idx: np.ndarray,
-) -> Any:
+) -> HistGradientBoostingRegressor:
     cols = list(X.columns)
     est = build(cfg, cols)
     est.fit(X.iloc[fit_idx].to_numpy(), y[fit_idx],
@@ -70,7 +73,7 @@ def _fit_reg(
     return est
 
 
-def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
+def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, float]:
     """CV out-of-fold predictions for full / time-only models + dummy, with
     per-grow NMAE overall and on fault scenarios. Returns a metrics dict."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
@@ -101,7 +104,7 @@ def _cv_predict_biomass(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     }
 
 
-def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
+def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, float]:
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = {k: np.full(len(fb.y_health), np.nan) for k in ("full", "time_only")}
     for train_idx, test_idx in folds:
@@ -127,7 +130,7 @@ def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     }
 
 
-def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
+def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, float]:
     """Stage is a sim clock; gate the SENSORS-ONLY model vs a time-only model."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = {k: np.full(len(fb.y_stage_code), -1) for k in ("with_time", "sensors", "time_only")}
@@ -155,7 +158,7 @@ def _cv_predict_stage(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     }
 
 
-def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
+def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, dict[str, float]]:
     """Biomass per-grow MAE broken out per scenario, via a single grouped CV."""
     folds = make_cv_folds(fb.groups, fb.scenarios, cfg)
     oof = np.full(len(fb.y_biomass), np.nan)
@@ -170,7 +173,14 @@ def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, Any]:
     return out
 
 
-def _fit_final(fb: FeatureFrame, cfg: TrainConfig) -> tuple[Any, Any, Any, Any]:
+def _fit_final(
+    fb: FeatureFrame, cfg: TrainConfig
+) -> tuple[
+    HistGradientBoostingRegressor,
+    HistGradientBoostingRegressor,
+    HistGradientBoostingClassifier,
+    DummyRegressor,
+]:
     """Refit deployable models on all grows (grouped inner-val for early stop)."""
     idx = np.arange(len(fb.X))
     fit_idx, val_idx = inner_val_split(idx, fb.groups, fb.scenarios, cfg)

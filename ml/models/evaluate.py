@@ -86,7 +86,11 @@ class GateResult:
 
 
 def run_gate(
-    cfg: TrainConfig, *, biomass: dict[str, Any], health: dict[str, Any], stage: dict[str, Any]
+    cfg: TrainConfig,
+    *,
+    biomass: dict[str, float],
+    health: dict[str, float],
+    stage: dict[str, float],
 ) -> GateResult:
     """Criterion 1 (binding): each GBT beats both its dummy and the time-only
     model by the margin (biomass/health on fault scenarios); stage sensors-only

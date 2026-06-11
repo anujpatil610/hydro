@@ -22,6 +22,19 @@ def test_end_to_end_small_corpus(tmp_path):
     cfg = TrainConfig(n_splits=3, max_iter=80, windows=(6, 24))
     report = train_all(str(out_root / "mini"), config=cfg, out_dir=str(art),
                        created_at="t", git_commit="c", omp_num_threads="1")
-    assert "biomass_beats_time_only" in report.gate.criteria
+
+    import numpy as np
+
+    # all three binding gate criteria were evaluated (not just one)
+    for k in ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only"):
+        assert k in report.gate.criteria
+
     bundle = load_bundle(str(art), strict=True)
     assert bundle["preprocessor"]["stage_order"][0] == "germination"
+    # the three deployable models survived serialization and predict a finite value
+    n = len(bundle["preprocessor"]["feature_names"])
+    x0 = np.zeros((1, n))
+    for key in ("biomass", "health", "stage"):
+        pred = bundle[key].predict(x0)
+        assert pred.shape == (1,)
+    assert np.isfinite(bundle["biomass"].predict(x0)[0])

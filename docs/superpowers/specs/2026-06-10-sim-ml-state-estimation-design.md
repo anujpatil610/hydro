@@ -197,7 +197,7 @@ Saved with `joblib.dump(protocol=5, compress=3)`. `preprocessor.joblib` is the i
 
 **Security:** `.joblib` files are pickle-based and execute code on load — only load bundles produced by this repo's own train run, never an untrusted artifact. A `sha256` of each `.joblib` is recorded in the manifest so a tampered/partial bundle fails before load.
 
-**`manifest.json`** records: `schema_version`, `corpus` (root + index hash + grow count), `git_commit`, `created_at` (passed in, not wall-clocked), full `TrainConfig` (hyperparameters + seed), a **versions block** (python, scikit-learn, numpy, scipy, joblib, pyarrow), **platform** (os, arch — documents the x86-train vs ARM-infer boundary), **`OMP_NUM_THREADS`**, the feature-name list sha256, and the CV fold assignment (run_id → fold). A pinned `requirements.lock` (and its sha256) is written into the bundle so the env is reconstructable, not merely described. Given manifest + corpus + lock, training reproduces bit-for-bit at the recorded thread count.
+**`manifest.json`** records: `schema_version`, `corpus` (root + index hash + grow count), `git_commit`, `created_at` (passed in, not wall-clocked), full `TrainConfig` (hyperparameters + seed), a **versions block** (python, scikit-learn, numpy, scipy, joblib, pyarrow), **platform** (os, arch — documents the x86-train vs ARM-infer boundary), **`OMP_NUM_THREADS`**, **sha256 of each `.joblib`** (verified before load), and the **CV fold assignment** (run_id → fold). Given manifest + corpus + a matching pinned env, training reproduces bit-for-bit at the recorded thread count. *(Deferred to a follow-on: a separate feature-name-list sha256 and a `requirements.lock` written into the bundle — the versions block already pins the inference-critical libraries.)*
 
 A `load_bundle(path, *, strict=True)` helper compares the manifest versions block against the running interpreter and **raises (strict) or loudly warns** on mismatch, and escalates sklearn's `InconsistentVersionWarning` to an error with manifest context — because a same-process round-trip test cannot catch the cross-version drift the Pi will hit.
 
@@ -206,7 +206,7 @@ A `load_bundle(path, *, strict=True)` helper compares the manifest versions bloc
 ### CLI — `ml/cli.py` / `python -m ml`
 - `python -m ml generate-corpus [--regenerate]` → `ensure_corpus()`.
 - `python -m ml train [--corpus PATH] [--out artifacts/] [--strict]` → `train_all`, prints report.
-- `python -m ml evaluate --artifacts PATH` → re-score saved bundle against the test grows (no refit), re-check the gate.
+- `python -m ml evaluate --artifacts PATH` → verify the saved bundle (sha256 of each `.joblib` + library versions, via `load_bundle`) and re-display the CV-computed gate from `metrics.json`. *(A true no-refit re-score is ill-defined here: the gate metrics come from per-fold out-of-fold CV predictions made during training and cannot be reconstructed from the final all-data models without refitting — so the gate is computed once at train time and integrity-verified + displayed at evaluate time.)*
 
 `created_at`/`git_commit` resolved and `OMP_NUM_THREADS` set at the CLI boundary (B's pattern), keeping the library wall-clock-free, thread-deterministic, and testable.
 
@@ -219,7 +219,7 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 
 | # | Gap | In-scope-now mitigation | Follow-on |
 |---|---|---|---|
-| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | Robustness perturbation gate (criterion 4) | Corpus-side domain randomization of noise/offset/gain |
+| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | `perturb_observed` helper built + unit-tested (execution deferred — see Out of scope) | Wire the robustness report; corpus-side domain randomization of noise/offset/gain |
 | 2 | **Calibration/units gap** — real `ph_obs`/`ec_obs` need per-probe calibration | Preprocessor documents expected units/ranges; manifest records them | Per-probe calibration step at deploy |
 | 3 | **Unmodeled real dynamics** — cultivar, light spectrum, disease absent from the ODE | LOSO report flags regime sensitivity | Expand the twin / collect real edge cases |
 | 4 | **Covariate shift** detectable at deploy | — | Two-sample / domain-classifier shift check (real feature dist vs. corpus) before trusting predictions |
@@ -235,6 +235,11 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 - **`skops.io`** secure persistence and **ONNX** export — deferred (joblib + version pinning + trust note suffices for a first slice).
 - **Corpus-side domain randomization** of sensor parameters — deferred (touches B's factory); risk #1 above.
 - Online/incremental learning; the corpus is generated once and trained offline.
+
+**Deferred during implementation → follow-on "C1-eval-extras" (the first slice builds the binding gate; these are the spec's flagged/informational extras):**
+- **Robustness-perturbation report (gate criterion 4)** — `perturb_observed` is built and unit-tested but **not yet wired** into `train_all`/`evaluate`; the degradation curve and the `robustness_max_mae_ratio` flag are pending. This is the flagship transfer check and the top of the C1-eval-extras follow-on.
+- **Leave-one-scenario-out (LOSO)** report and the **full ablation table** — the gate uses the time-only baseline (the binding bar) and computes the dummy floor and sensors-only stage model; not yet emitted are the per-target **sensors-only biomass** variant, an explicit **dummy-vs-GBT** gate check, and the consolidated full/sensors-only/time-only/LOSO table in `metrics.json`/`report.md`.
+- **Manifest extras** — feature-name-list sha256 and an embedded `requirements.lock` (the versions block already pins the inference-critical libraries).
 
 ## Testing
 

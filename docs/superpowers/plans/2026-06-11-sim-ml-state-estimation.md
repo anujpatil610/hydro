@@ -1351,7 +1351,7 @@ def test_run_gate_flags_when_model_does_not_beat_time_only():
         cfg,
         biomass={"nmae_full": 0.10, "nmae_time_only": 0.10, "nmae_dummy": 0.5,
                  "nmae_full_fault": 0.10, "nmae_time_only_fault": 0.10},
-        health={"mae_full": 0.05, "nmae_time_only": 0.4, "nmae_full": 0.1},
+        health={"mae_full": 0.05, "nmae_full_fault": 0.1, "nmae_time_only_fault": 0.4},
         stage={"qwk_with_time": 0.99, "qwk_sensors": 0.7, "qwk_time_only": 0.65,
                "adjacent_acc_sensors": 0.95},
     )
@@ -1461,7 +1461,9 @@ def run_gate(cfg: TrainConfig, *, biomass: dict, health: dict, stage: dict) -> G
     c["biomass_beats_time_only"] = (
         biomass["nmae_full_fault"] <= biomass["nmae_time_only_fault"] * (1 - cfg.beat_margin)
     )
-    c["health_beats_time_only"] = health["nmae_full"] <= health["nmae_time_only"] * (1 - cfg.beat_margin)
+    c["health_beats_time_only"] = (
+        health["nmae_full_fault"] <= health["nmae_time_only_fault"] * (1 - cfg.beat_margin)
+    )
     c["stage_beats_time_only"] = (
         stage["qwk_sensors"] >= stage["qwk_time_only"] + cfg.stage_qwk_margin
         and stage["adjacent_acc_sensors"] >= cfg.stage_adjacent_acc_min
@@ -1565,13 +1567,17 @@ def test_artifact_round_trips_identically(trained):
     assert np.array_equal(model.predict(X), model.predict(X))
 
 
-def test_load_bundle_rejects_version_mismatch(trained, monkeypatch):
+def test_load_bundle_rejects_version_mismatch(trained, tmp_path):
+    import shutil
+
     out, _ = trained
-    man = json.loads((out / "manifest.json").read_text())
+    dst = tmp_path / "bundle"
+    shutil.copytree(out, dst)
+    man = json.loads((dst / "manifest.json").read_text())
     man["versions"]["scikit_learn"] = "0.0.0-doctored"
-    (out / "manifest.json").write_text(json.dumps(man))
+    (dst / "manifest.json").write_text(json.dumps(man))
     with pytest.raises(BundleVersionError, match="scikit_learn"):
-        load_bundle(str(out), strict=True)
+        load_bundle(str(dst), strict=True)
 
 
 def test_predicted_biomass_is_monotone_in_time(trained):
@@ -1605,6 +1611,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import platform
 import sys
 from dataclasses import dataclass, field
@@ -1695,10 +1702,13 @@ def _cv_predict_health(fb: FeatureFrame, cfg: TrainConfig) -> dict:
         oof["full"][test_idx] = predict_health(full, _Xsub(fb.X, "full").iloc[test_idx].to_numpy())
         oof["time_only"][test_idx] = predict_health(tonly, _Xsub(fb.X, "time_only").iloc[test_idx].to_numpy())
     yt = fb.y_health
+    fault = fb.scenarios != "clean"
     return {
         "mae_full": per_grow_mae(yt, oof["full"], fb.groups),
         "nmae_full": nmae(yt, oof["full"]),
         "nmae_time_only": nmae(yt, oof["time_only"]),
+        "nmae_full_fault": nmae(yt[fault], oof["full"][fault]),
+        "nmae_time_only_fault": nmae(yt[fault], oof["time_only"][fault]),
     }
 
 
@@ -1772,6 +1782,17 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _json_safe(obj):
+    """Replace non-finite floats (nan/inf) with None so artifacts are valid JSON."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 def train_all(
     corpus_root: str,
     *,
@@ -1820,11 +1841,12 @@ def train_all(
     joblib.dump(stage, out / "stage.joblib", protocol=5, compress=3)
     joblib.dump({"dummy_biomass": dummy}, out / "baselines.joblib", protocol=5, compress=3)
     joblib.dump(preprocessor, out / "preprocessor.joblib", protocol=5, compress=3)
-    (out / "metrics.json").write_text(json.dumps(metrics, indent=2, default=float))
+    (out / "metrics.json").write_text(json.dumps(_json_safe(metrics), indent=2))
     (out / "report.md").write_text(_render_report(metrics, gate))
 
     sha = {f: _sha256(out / f) for f in
-           ("biomass.joblib", "health.joblib", "stage.joblib", "preprocessor.joblib")}
+           ("biomass.joblib", "health.joblib", "stage.joblib",
+            "baselines.joblib", "preprocessor.joblib")}
     manifest = {
         "schema_version": "1.0",
         "created_at": created_at,
@@ -1837,7 +1859,7 @@ def train_all(
         "sha256": sha,
         "n_grows": len(grows),
     }
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
+    (out / "manifest.json").write_text(json.dumps(_json_safe(manifest), indent=2, default=str))
     return TrainReport(gate=gate, metrics=metrics)
 
 

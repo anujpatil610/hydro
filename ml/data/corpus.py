@@ -23,14 +23,6 @@ def _index_exists(root: Path) -> bool:
     return (root / "index.json").exists()
 
 
-def _is_complete(root: Path) -> bool:
-    """True only when index.json exists, reports zero failures, and has runs."""
-    if not _index_exists(root):
-        return False
-    data = json.loads((root / "index.json").read_text())
-    return data.get("failed", 1) == 0 and bool(data.get("runs"))
-
-
 def _validate(root: Path) -> None:
     data = json.loads((root / "index.json").read_text())
     if data.get("failed", 0) != 0:
@@ -55,7 +47,7 @@ def ensure_corpus(
     git_commit: str,
     workers: int | None = None,
 ) -> Path:
-    """Return the corpus dir, generating it from `config_path` if absent/incomplete.
+    """Return the corpus dir, generating it from `config_path` only when no index.json exists.
 
     If index.json already exists (even with failures), validate it and raise
     CorpusError rather than silently regenerating — the caller must pass

@@ -9,6 +9,7 @@ def test_generate_corpus_then_train_then_evaluate(tmp_path, tiny_corpus):
     rc = main([
         "train", "--corpus", str(tiny_corpus), "--out", str(art),
         "--n-splits", "2", "--max-iter", "15", "--windows", "4,8",
+        "--no-eval-extras",
     ])
     assert rc in (0, 1)  # 0 pass / 1 gate-fail; both are valid runs
     assert (art / "manifest.json").exists()
@@ -20,6 +21,7 @@ def test_generate_corpus_then_train_then_evaluate(tmp_path, tiny_corpus):
 def test_train_sets_and_records_omp_threads(tmp_path, tiny_corpus, monkeypatch):
     art = tmp_path / "a"
     main(["train", "--corpus", str(tiny_corpus), "--out", str(art),
-          "--n-splits", "2", "--max-iter", "15", "--windows", "4,8", "--threads", "1"])
+          "--n-splits", "2", "--max-iter", "15", "--windows", "4,8", "--threads", "1",
+          "--no-eval-extras"])
     man = json.loads((art / "manifest.json").read_text())
     assert man["omp_num_threads"] == "1"

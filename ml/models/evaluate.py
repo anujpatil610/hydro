@@ -113,10 +113,12 @@ def run_gate(
     biomass: dict[str, float],
     health: dict[str, float],
     stage: dict[str, float],
+    robustness: dict[str, Any] | None = None,
 ) -> GateResult:
     """Criterion 1 (binding): each GBT beats both its dummy and the time-only
     model by the margin (biomass/health on fault scenarios); stage sensors-only
-    beats time-only QWK by margin with adjacent-acc floor. Criterion 2 is advisory."""
+    beats time-only QWK by margin with adjacent-acc floor. Criterion 2 is advisory.
+    Optional robustness dict adds a non-binding robustness_ok advisory criterion."""
     c: dict[str, bool] = {}
 
     # criterion 1 — sensors carry signal
@@ -136,6 +138,11 @@ def run_gate(
     c["health_mae_sane"] = health["mae_full"] <= cfg.health_mae_max
     c["stage_with_time_intact"] = stage["qwk_with_time"] >= cfg.stage_qwk_with_time_min
     c["stage_sensors_sane"] = stage["qwk_sensors"] >= cfg.stage_qwk_sensors_min
+
+    # criterion 3 — robustness (advisory, non-binding)
+    if robustness is not None:
+        ratio = robustness["levels"][robustness["flag_level"]]["mae_ratio"]
+        c["robustness_ok"] = ratio <= robustness["max_mae_ratio"]
 
     binding = ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only")
     passed = all(c[k] for k in binding)

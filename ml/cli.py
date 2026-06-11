@@ -33,6 +33,8 @@ def _config_from_args(args: argparse.Namespace) -> TrainConfig:
         kw["max_iter"] = args.max_iter
     if args.windows:
         kw["windows"] = tuple(int(w) for w in args.windows.split(","))
+    if getattr(args, "no_eval_extras", False):
+        kw["run_eval_extras"] = False
     return TrainConfig(**kw)
 
 
@@ -53,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--windows", default=None, help="comma list, e.g. 24,144,1008")
     t.add_argument("--threads", default="4", help="OMP_NUM_THREADS (determinism)")
     t.add_argument("--strict", action="store_true", help="non-zero exit if gate fails")
+    t.add_argument("--no-eval-extras", action="store_true",
+                   help="skip ablation/robustness/LOSO extras (faster; for CI)")
 
     e = sub.add_parser("evaluate", help="re-check the gate from a saved bundle")
     e.add_argument("--artifacts", required=True)

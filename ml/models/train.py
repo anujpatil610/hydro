@@ -394,6 +394,15 @@ def train_all(
         "n_rows": int(len(fb.X)),
     }
 
+    if config.run_eval_extras:
+        robustness = robustness_report(grows, config)
+        gate = run_gate(config, biomass=biomass_m, health=health_m, stage=stage_m,
+                        robustness=robustness)
+        metrics["ablation"] = ablation_table(fb, config, biomass_m, health_m, stage_m)
+        metrics["robustness"] = robustness
+        metrics["loso"] = loso_report(grows, config)
+        metrics["gate"] = {"passed": gate.passed, "criteria": gate.criteria}
+
     biomass, health, stage, dummy = _fit_final(fb, config)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -468,6 +477,18 @@ def _render_report(metrics: dict[str, Any], gate: GateResult) -> str:
     lines.append("## Stage")
     for k, v in metrics["stage"].items():
         lines.append(f"- {k}: {v:.4f}")
+    if "ablation" in metrics:
+        lines.append("## Ablation (per-target variants)")
+        for tgt, d in metrics["ablation"].items():
+            lines.append(f"- {tgt}: " + ", ".join(f"{k}={v:.4f}" for k, v in d.items()))
+        rob = metrics["robustness"]["levels"]
+        lines.append("## Robustness (biomass MAE ratio vs unperturbed)")
+        for name, d in rob.items():
+            lines.append(f"- {name}: ratio={d['mae_ratio']:.3f} (mae={d['mae']:.4f})")
+        lines.append("## LOSO (train on others, test on the held-out scenario)")
+        for s, d in metrics["loso"].items():
+            lines.append(f"- {s}: biomass_mae={d['biomass_mae']:.4f}, "
+                         f"stage_sensors_qwk={d['stage_sensors_qwk']:.4f}")
     return "\n".join(lines) + "\n"
 
 

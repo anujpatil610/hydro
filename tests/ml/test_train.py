@@ -11,7 +11,8 @@ from ml.models.train import BundleVersionError, load_bundle, train_all
 @pytest.fixture(scope="module")
 def trained(tmp_path_factory, tiny_corpus):
     out = tmp_path_factory.mktemp("artifacts") / "run1"
-    cfg = TrainConfig(n_splits=2, max_iter=20, windows=(4, 8), val_fraction=0.5)
+    cfg = TrainConfig(n_splits=2, max_iter=20, windows=(4, 8), val_fraction=0.5,
+                      run_eval_extras=False)
     report = train_all(
         str(tiny_corpus), config=cfg, out_dir=str(out),
         created_at="2026-06-11T00:00:00Z", git_commit="abc1234",
@@ -83,6 +84,18 @@ def test_load_bundle_rejects_version_mismatch(trained, tmp_path):
     (dst / "manifest.json").write_text(json.dumps(man))
     with pytest.raises(BundleVersionError, match="scikit_learn"):
         load_bundle(str(dst), strict=True)
+
+
+def test_train_with_eval_extras_writes_reports(tmp_path_factory, tiny_corpus):
+    out = tmp_path_factory.mktemp("artifacts_x") / "run"
+    cfg = TrainConfig(n_splits=2, max_iter=15, windows=(4, 8), val_fraction=0.5,
+                      run_eval_extras=True)
+    train_all(str(tiny_corpus), config=cfg, out_dir=str(out),
+              created_at="t", git_commit="c", omp_num_threads="1")
+    import json
+    metrics = json.loads((out / "metrics.json").read_text())
+    assert "ablation" in metrics and "robustness" in metrics and "loso" in metrics
+    assert "robustness_ok" in metrics["gate"]["criteria"]
 
 
 def test_predicted_biomass_is_monotone_in_time(trained):

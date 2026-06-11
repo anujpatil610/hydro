@@ -26,21 +26,24 @@ from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostin
 from ml.config import STAGE_ORDER, TrainConfig
 from ml.data.corpus import ensure_corpus
 from ml.data.features import FeatureFrame, build_features, feature_columns
-from ml.data.loading import load_corpus
+from ml.data.loading import Grow, load_corpus
 from ml.data.splits import inner_val_split, make_cv_folds
 from ml.models.estimators import (
     build_biomass,
+    build_dummy_classifier,
     build_dummy_regressor,
     build_health,
     build_stage,
     predict_health,
 )
 from ml.models.evaluate import (
+    ROBUSTNESS_LEVELS,
     GateResult,
     adjacent_accuracy,
     ordinal_mae,
     per_grow_mae,
     per_grow_nmae,
+    perturb_observed,
     quadratic_weighted_kappa,
     run_gate,
 )
@@ -176,6 +179,139 @@ def _by_scenario(fb: FeatureFrame, cfg: TrainConfig) -> dict[str, dict[str, floa
     for s in sorted(set(fb.scenarios)):
         m = fb.scenarios == s
         out[s] = {"biomass_mae": per_grow_mae(fb.y_biomass[m], oof[m], fb.groups[m])}
+    return out
+
+
+def _oof_reg(
+    fb: FeatureFrame,
+    config: TrainConfig,
+    y: np.ndarray,
+    subset: str,
+    build: Callable[[TrainConfig, list[str]], HistGradientBoostingRegressor],
+) -> np.ndarray:
+    """Out-of-fold predictions for a regressor builder on a feature subset."""
+    oof = np.full(len(y), np.nan)
+    X = _Xsub(fb.X, subset)
+    cols = list(X.columns)
+    for train_idx, test_idx in make_cv_folds(fb.groups, fb.scenarios, config):
+        fit_idx, val_idx = inner_val_split(train_idx, fb.groups, fb.scenarios, config)
+        est = build(config, cols)
+        est.fit(X.iloc[fit_idx].to_numpy(), y[fit_idx],
+                X_val=X.iloc[val_idx].to_numpy(), y_val=y[val_idx])
+        oof[test_idx] = est.predict(X.iloc[test_idx].to_numpy())
+    return oof
+
+
+def ablation_table(
+    fb: FeatureFrame,
+    config: TrainConfig,
+    biomass_m: dict[str, float],
+    health_m: dict[str, float],
+    stage_m: dict[str, float],
+) -> dict[str, dict[str, float]]:
+    """Full vs sensors-only vs time-only vs dummy, per target. Reuses the gate
+    metric dicts and computes only the variants they don't already contain."""
+    b_sens = _oof_reg(fb, config, fb.y_biomass, "sensors_only", build_biomass)
+    h_sens = np.clip(_oof_reg(fb, config, fb.y_health, "sensors_only", build_health), 0.0, 1.0)
+    dstage = np.full(len(fb.y_stage_code), -1)
+    Xfull = _Xsub(fb.X, "full")
+    for train_idx, test_idx in make_cv_folds(fb.groups, fb.scenarios, config):
+        d = build_dummy_classifier().fit(
+            Xfull.iloc[train_idx].to_numpy(), fb.y_stage_code[train_idx]
+        )
+        dstage[test_idx] = d.predict(Xfull.iloc[test_idx].to_numpy())
+    return {
+        "biomass": {
+            "full_nmae": biomass_m["nmae_full"],
+            "sensors_only_nmae": per_grow_nmae(fb.y_biomass, b_sens, fb.groups),
+            "time_only_nmae": biomass_m["nmae_time_only"],
+            "dummy_nmae": biomass_m["nmae_dummy"],
+        },
+        "health": {
+            "full_nmae": health_m["nmae_full"],
+            "sensors_only_nmae": per_grow_nmae(fb.y_health, h_sens, fb.groups),
+            "time_only_nmae": health_m["nmae_time_only"],
+        },
+        "stage": {
+            "with_time_qwk": stage_m["qwk_with_time"],
+            "sensors_qwk": stage_m["qwk_sensors"],
+            "time_only_qwk": stage_m["qwk_time_only"],
+            "dummy_qwk": quadratic_weighted_kappa(fb.y_stage_code, dstage),
+        },
+    }
+
+
+def _perturb_grows(grows: list[Grow], level: dict[str, Any], seed: int) -> list[Grow]:
+    out: list[Grow] = []
+    for i, g in enumerate(grows):
+        df = perturb_observed(g.df, noise_sigma=level["noise_sigma"],
+                              ph_offset=level["ph_offset"], ec_gain=level["ec_gain"],
+                              seed=seed + i)
+        out.append(Grow(g.run_id, g.scenario, g.seed, df))
+    return out
+
+
+def _per_grow_mae_dict(y: np.ndarray, pred: np.ndarray, groups: np.ndarray) -> dict[str, float]:
+    err = np.abs(y - pred)
+    s = pd.Series(err).groupby(pd.Series(groups)).mean()
+    return {str(k): float(v) for k, v in s.items()}
+
+
+def robustness_report(grows: list[Grow], config: TrainConfig) -> dict[str, Any]:
+    """Re-score the biomass model on perturbed observed inputs (per fold, no
+    refit beyond the fold's own model). Non-gating; reports MAE degradation."""
+    fb = build_features(grows, config)
+    by_runid = {g.run_id: g for g in grows}
+    Xfull = _Xsub(fb.X, "full")
+    base: dict[str, float] = {}
+    lvl: dict[str, dict[str, float]] = {str(x["name"]): {} for x in ROBUSTNESS_LEVELS}
+    for train_idx, test_idx in make_cv_folds(fb.groups, fb.scenarios, config):
+        fit_idx, val_idx = inner_val_split(train_idx, fb.groups, fb.scenarios, config)
+        model = build_biomass(config, list(Xfull.columns))
+        model.fit(Xfull.iloc[fit_idx].to_numpy(), fb.y_biomass[fit_idx],
+                  X_val=Xfull.iloc[val_idx].to_numpy(), y_val=fb.y_biomass[val_idx])
+        test_grows = [by_runid[r] for r in sorted(set(fb.groups[test_idx]))]
+        tfb = build_features(test_grows, config)
+        base.update(_per_grow_mae_dict(
+            tfb.y_biomass, model.predict(_Xsub(tfb.X, "full").to_numpy()), tfb.groups))
+        for level in ROBUSTNESS_LEVELS:
+            pfb = build_features(_perturb_grows(test_grows, level, config.seed), config)
+            lvl[str(level["name"])].update(_per_grow_mae_dict(
+                pfb.y_biomass, model.predict(_Xsub(pfb.X, "full").to_numpy()), pfb.groups))
+    base_mae = float(np.mean(list(base.values()))) if base else float("inf")
+    levels = {}
+    for name, d in lvl.items():
+        mae = float(np.mean(list(d.values()))) if d else float("inf")
+        levels[name] = {"mae": mae,
+                        "mae_ratio": (mae / base_mae if base_mae > 0 else float("inf"))}
+    return {"baseline_mae": base_mae, "levels": levels,
+            "flag_level": "combined", "max_mae_ratio": config.robustness_max_mae_ratio}
+
+
+def loso_report(grows: list[Grow], config: TrainConfig) -> dict[str, dict[str, float]]:
+    """Leave-one-scenario-out: train on the other scenarios, test on the held-out
+    one. The closest no-real-data proxy for deploying into an unseen regime."""
+    out: dict[str, dict[str, float]] = {}
+    for s in sorted({g.scenario for g in grows}):
+        train_g = [g for g in grows if g.scenario != s]
+        test_g = [g for g in grows if g.scenario == s]
+        if not train_g or not test_g:
+            continue
+        trfb = build_features(train_g, config)
+        tefb = build_features(test_g, config)
+        idx = np.arange(len(trfb.X))
+        fit_idx, val_idx = inner_val_split(idx, trfb.groups, trfb.scenarios, config)
+        xtr, xte = _Xsub(trfb.X, "full"), _Xsub(tefb.X, "full")
+        bm = build_biomass(config, list(xtr.columns))
+        bm.fit(xtr.iloc[fit_idx].to_numpy(), trfb.y_biomass[fit_idx],
+               X_val=xtr.iloc[val_idx].to_numpy(), y_val=trfb.y_biomass[val_idx])
+        b_mae = per_grow_mae(tefb.y_biomass, bm.predict(xte.to_numpy()), tefb.groups)
+        xtr_s, xte_s = _Xsub(trfb.X, "sensors_only"), _Xsub(tefb.X, "sensors_only")
+        st = build_stage(config, list(xtr_s.columns))
+        st.fit(xtr_s.iloc[fit_idx].to_numpy(), trfb.y_stage_code[fit_idx],
+               X_val=xtr_s.iloc[val_idx].to_numpy(), y_val=trfb.y_stage_code[val_idx])
+        s_qwk = quadratic_weighted_kappa(tefb.y_stage_code, st.predict(xte_s.to_numpy()))
+        out[s] = {"biomass_mae": b_mae, "stage_sensors_qwk": s_qwk}
     return out
 
 

@@ -73,10 +73,16 @@ export function TwinDashboard({
       .catch(() => setTwinError(true));
   }, 5000);
   useEffect(() => {
+    let cancelled = false;
     twinApi
       .history(windowHours)
-      .then(setHistory)
+      .then((h) => {
+        if (!cancelled) setHistory(h);
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [windowHours]);
   useInterval(() => {
     twinApi
@@ -141,6 +147,7 @@ export function TwinDashboard({
             <button
               key={w.label}
               type="button"
+              aria-pressed={windowHours === w.hours}
               onClick={() => setWindowHours(w.hours)}
               className={`rounded-full px-2.5 py-1 ${
                 windowHours === w.hours ? "bg-leaf/20 text-leaf" : "text-slate-400"

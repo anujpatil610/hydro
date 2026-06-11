@@ -1,20 +1,25 @@
 import { useMemo } from "react";
 import { leafLayout } from "../../lib/plant";
 import type { TwinReservoir } from "../../lib/twin";
+import { useSmoothed } from "../../lib/useSmoothed";
 
 // Day sky -> night sky behind the plant; grow-light glow when light_on.
 const SKY_DAY = ["#1c2a3a", "#27445e"];
 const SKY_NIGHT = ["#0b1020", "#141a2e"];
 
 export function PlantHero({ twin }: { twin: TwinReservoir }) {
+  // Tween the geometry inputs between 5s polls; the numeric readouts
+  // below keep showing the raw twin values.
+  const biomass = useSmoothed(twin.biomass_g);
+  const health = useSmoothed(twin.health);
   const leaves = useMemo(
     () =>
       leafLayout({
-        biomassG: twin.biomass_g,
+        biomassG: biomass,
         biomassMaxG: twin.biomass_max_g,
-        health: twin.health,
+        health,
       }),
-    [twin.biomass_g, twin.biomass_max_g, twin.health],
+    [biomass, twin.biomass_max_g, health],
   );
   const sky = twin.climate.light_on ? SKY_DAY : SKY_NIGHT;
   const day = Math.floor(twin.days_elapsed) + 1;

@@ -36,20 +36,20 @@ def test_features_drop_warmup_and_have_no_nans():
     assert not fb.X.isna().any().any()
 
 
-def test_no_forbidden_columns_leak_into_X():
-    cfg = TrainConfig(windows=(4, 8))
-    fb = build_features([_synthetic_grow(n=60)], cfg)
-    for col in fb.X.columns:
-        # X columns are engineered names, never raw truth columns
-        assert not is_forbidden_feature_raw_leak(col)
-
-
 def is_forbidden_feature_raw_leak(col: str) -> bool:
     # a raw forbidden column would appear verbatim; engineered names won't
     return is_forbidden_feature(col) and col in {
         "biomass_g", "health", "stage", "ph_true", "ec_true", "temp_true",
         "stage_progress", "acc_conc", "stress_ph",
     }
+
+
+def test_no_forbidden_columns_leak_into_X():
+    cfg = TrainConfig(windows=(4, 8))
+    fb = build_features([_synthetic_grow(n=60)], cfg)
+    for col in fb.X.columns:
+        # X columns are engineered names, never raw truth columns
+        assert not is_forbidden_feature_raw_leak(col)
 
 
 def test_features_are_causal_no_future_leakage():
@@ -104,3 +104,5 @@ def test_monotone_features_are_cumulative_and_time():
     assert MONOTONE_FEATURES == {
         "days_since_start", "gdd_cum", "photoperiod_hours_cum", "ec_drawdown_cum",
     }
+    fb = build_features([_synthetic_grow(n=40)], TrainConfig(windows=(4, 8)))
+    assert MONOTONE_FEATURES <= set(fb.X.columns)

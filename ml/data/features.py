@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from ml.config import OBSERVED_COLS, STAGE_TO_CODE, TrainConfig
+from ml.data.loading import Grow
 
 # Cumulative/time features whose relationship to biomass is monotone non-decreasing.
 MONOTONE_FEATURES = {
@@ -19,6 +20,7 @@ MONOTONE_FEATURES = {
 
 # Explicit clock / light-schedule features (dropped for the sensors-only ablation).
 _CLOCK_FEATURES = {"days_since_start", "photoperiod_hours_cum", "light_on_last"}
+# list, not set: feature_columns preserves this order.
 _TIME_ONLY_FEATURES = ["days_since_start", "photoperiod_hours_cum"]
 
 
@@ -55,6 +57,7 @@ def _window_block(series: pd.Series, windows: tuple[int, ...]) -> dict[str, np.n
         std = np.zeros(n)
         mac = np.zeros(n)        # mean absolute step-to-step change (robust volatility)
         dropout = np.zeros(n)    # fraction of repeated (flatline) samples in the window
+        # O(n*w) per sensor/window; fine for one-time offline corpus build (vectorize if it grows).
         for i in range(n):
             lo = max(0, i - w + 1)
             win = vals[lo : i + 1]
@@ -62,7 +65,7 @@ def _window_block(series: pd.Series, windows: tuple[int, ...]) -> dict[str, np.n
             std[i] = float(win.std()) if len(win) > 1 else 0.0
             d = np.abs(np.diff(win)) if len(win) > 1 else np.array([0.0])
             mac[i] = float(d.mean())
-            dropout[i] = float((d == 0.0).mean()) if len(d) else 0.0
+            dropout[i] = float((d == 0.0).mean())
         out[f"{series.name}_slope_{w}"] = slope
         out[f"{series.name}_std_{w}"] = std
         out[f"{series.name}_mac_{w}"] = mac
@@ -71,6 +74,7 @@ def _window_block(series: pd.Series, windows: tuple[int, ...]) -> dict[str, np.n
 
 
 def _grow_features(df: pd.DataFrame, cfg: TrainConfig) -> pd.DataFrame:
+    """All feature columns for one grow's frame: window + cumulative + time."""
     n = len(df)
     cols: dict[str, np.ndarray] = {}
 
@@ -107,9 +111,12 @@ def _grow_features(df: pd.DataFrame, cfg: TrainConfig) -> pd.DataFrame:
     return pd.DataFrame(cols, index=df.index)
 
 
-def build_features(grows, cfg: TrainConfig) -> FeatureFrame:
+def build_features(grows: list[Grow], cfg: TrainConfig) -> FeatureFrame:
     """Build aligned X / labels / groups across grows, dropping each grow's
-    warmup rows (first max(windows)) so every feature row is fully populated."""
+    warmup rows (first max(windows)) so every feature row is fully populated.
+
+    Each Grow contributes its ``df`` (feature/label rows), ``run_id`` (group), and
+    ``scenario`` (per-row tag)."""
     warmup = max(cfg.windows)
     xs, yb, yh, ys, grp, scn = [], [], [], [], [], []
     for g in grows:

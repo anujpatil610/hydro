@@ -8,6 +8,6 @@ def test_ml_package_imports():
 
 def test_sklearn_available_at_required_version():
     import sklearn
-    from packaging.version import Version
 
-    assert Version(sklearn.__version__) >= Version("1.4")
+    major, minor = (int(x) for x in sklearn.__version__.split(".")[:2])
+    assert (major, minor) >= (1, 4)

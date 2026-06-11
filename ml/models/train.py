@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import platform
 import sys
 from dataclasses import dataclass, field
@@ -192,6 +193,17 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _json_safe(obj):
+    """Replace non-finite floats (nan/inf) with None so artifacts are valid JSON."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list | tuple):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 def train_all(
     corpus_root: str,
     *,
@@ -240,12 +252,15 @@ def train_all(
     joblib.dump(stage, out / "stage.joblib", protocol=5, compress=3)
     joblib.dump({"dummy_biomass": dummy}, out / "baselines.joblib", protocol=5, compress=3)
     joblib.dump(preprocessor, out / "preprocessor.joblib", protocol=5, compress=3)
-    (out / "metrics.json").write_text(json.dumps(metrics, indent=2, default=float))
+    (out / "metrics.json").write_text(json.dumps(_json_safe(metrics), indent=2))
     (out / "report.md").write_text(_render_report(metrics, gate))
 
     sha = {
         f: _sha256(out / f)
-        for f in ("biomass.joblib", "health.joblib", "stage.joblib", "preprocessor.joblib")
+        for f in (
+            "biomass.joblib", "health.joblib", "stage.joblib",
+            "baselines.joblib", "preprocessor.joblib",
+        )
     }
     manifest = {
         "schema_version": "1.0",
@@ -259,7 +274,7 @@ def train_all(
         "sha256": sha,
         "n_grows": len(grows),
     }
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
+    (out / "manifest.json").write_text(json.dumps(_json_safe(manifest), indent=2, default=str))
     return TrainReport(gate=gate, metrics=metrics)
 
 

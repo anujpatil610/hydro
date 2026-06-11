@@ -59,13 +59,17 @@ def test_artifact_round_trips_identically(trained):
     assert np.array_equal(model.predict(X), model.predict(X))
 
 
-def test_load_bundle_rejects_version_mismatch(trained, monkeypatch):
+def test_load_bundle_rejects_version_mismatch(trained, tmp_path):
+    import shutil
+
     out, _ = trained
-    man = json.loads((out / "manifest.json").read_text())
+    dst = tmp_path / "bundle"
+    shutil.copytree(out, dst)
+    man = json.loads((dst / "manifest.json").read_text())
     man["versions"]["scikit_learn"] = "0.0.0-doctored"
-    (out / "manifest.json").write_text(json.dumps(man))
+    (dst / "manifest.json").write_text(json.dumps(man))
     with pytest.raises(BundleVersionError, match="scikit_learn"):
-        load_bundle(str(out), strict=True)
+        load_bundle(str(dst), strict=True)
 
 
 def test_predicted_biomass_is_monotone_in_time(trained):

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from hal.factory import build_device_set
 
-from service.api import actuators, health, sensors, topology, twin
+from service.api import actuators, datasets, health, sensors, topology, twin
 from service.config import Settings
 from service.db.session import init_db, make_engine
 from service.poller import Poller
@@ -33,6 +33,10 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
         device_set = build_device_set(
             profile, calibration_path=Path(settings.calibration_path)
         )
+        if device_set.world is not None and settings.sim_speed != 1.0:
+            clock = device_set.world.clock
+            clock.speed = settings.sim_speed
+            clock.sample_interval_s = meta.poll_seconds * settings.sim_speed
         poller = Poller(device_set, engine, meta.poll_seconds, meta.retention_hours)
         app.state.settings = settings
         app.state.profile = profile
@@ -60,6 +64,7 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
     app.include_router(topology.router)
     app.include_router(sensors.router)
     app.include_router(twin.router)
+    app.include_router(datasets.router)
     app.include_router(actuators.router)
 
     # Serve the built dashboard (single-origin prod) when present.

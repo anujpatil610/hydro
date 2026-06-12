@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
     db_path: str = "data/hydro.db"
     calibration_path: str = "data/calibration.json"
 
+    # Root of factory output served read-only by /datasets (404 when absent).
+    datasets_dir: str = "data/datasets"
+
     # Fallbacks used only when a profile omits them (every shipped profile sets
     # its own retention_hours / poll_seconds). ``mode`` is unused by the
     # profile path and kept for the legacy build_hal factory only.
@@ -24,6 +28,10 @@ class Settings(BaseSettings):
     retention_hours: int = 24
     poll_seconds: int = 10
     pump_ml_per_min: float = 50.0
+
+    # Sim time-lapse: each poll advances poll_seconds * sim_speed sim-seconds.
+    # 1.0 = live; ~360 renders a 35-day grow in ~14 min. Sim mode only; restart to apply.
+    sim_speed: float = Field(default=1.0, gt=0)
 
     # Extra dev origins so the Vite dev server reaches the API before mDNS exists.
     cors_origins: tuple[str, ...] = (

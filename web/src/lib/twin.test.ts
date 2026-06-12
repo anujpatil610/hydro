@@ -23,8 +23,14 @@ const reservoir = {
 };
 
 it("parses /twin payload", () => {
-  const t = twinSchema.parse({ sim: true, sim_time_s: 1234, reservoirs: [reservoir] });
+  const t = twinSchema.parse({
+    sim: true,
+    sim_time_s: 1234,
+    sim_speed: 1,
+    reservoirs: [reservoir],
+  });
   expect(t.reservoirs[0].stage).toBe("seedling");
+  expect(t.sim_speed).toBe(1);
 });
 
 it("parses /twin/history payload", () => {

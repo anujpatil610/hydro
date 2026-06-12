@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Reading, Topology } from "../../lib/schema";
 import { type Twin, type TwinSample, twinApi } from "../../lib/twin";
 import { useInterval } from "../../lib/useInterval";
@@ -44,6 +44,13 @@ const VITALS = [
   },
 ] as const;
 
+const WINDOWS = [
+  { label: "1h", hours: 1 },
+  { label: "6h", hours: 6 },
+  { label: "24h", hours: 24 },
+  { label: "7d", hours: 168 },
+] as const;
+
 export function TwinDashboard({
   latest,
   topology,
@@ -53,16 +60,33 @@ export function TwinDashboard({
 }) {
   const [twin, setTwin] = useState<Twin | null>(null);
   const [history, setHistory] = useState<TwinSample[]>([]);
+  const [windowHours, setWindowHours] = useState<number>(24);
+  const [twinError, setTwinError] = useState(false);
 
   useInterval(() => {
     twinApi
       .twin()
-      .then(setTwin)
-      .catch(() => {});
+      .then((t) => {
+        setTwin(t);
+        setTwinError(false);
+      })
+      .catch(() => setTwinError(true));
   }, 5000);
+  useEffect(() => {
+    let cancelled = false;
+    twinApi
+      .history(windowHours)
+      .then((h) => {
+        if (!cancelled) setHistory(h);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [windowHours]);
   useInterval(() => {
     twinApi
-      .history(24)
+      .history(windowHours)
       .then(setHistory)
       .catch(() => {});
   }, 30000);
@@ -83,11 +107,57 @@ export function TwinDashboard({
     return pumps?.find((d) => d.role === "dose-nutrient")?.id ?? pumps?.[0]?.id ?? null;
   }, [topology, res?.reservoir_id]);
 
-  if (!res) return <p className="text-sm text-slate-500">Twin state loading…</p>;
+  if (!res) {
+    return (
+      <div className="rounded-2xl border border-ink-700 bg-ink-800 p-8 text-center text-sm text-slate-500">
+        {twinError
+          ? "Can't reach the twin — is the service running in sim mode?"
+          : "Twin state loading…"}
+      </div>
+    );
+  }
   const resHistory = history.filter((h) => h.reservoir_id === res.reservoir_id);
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-3">
+          <span className="text-lg font-semibold text-slate-100">
+            Day {Math.floor(res.days_elapsed) + 1}
+            <span className="text-sm font-normal text-slate-500"> of {res.harvest_day}</span>
+          </span>
+          {twin && twin.sim_speed !== 1 && (
+            <span className="rounded-full bg-blueprint/15 px-2 py-0.5 text-xs text-blueprint">
+              time-lapse ×{twin.sim_speed}
+            </span>
+          )}
+          {twinError ? (
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-400">
+              connection lost — showing last data
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-leaf">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-leaf" />
+              live
+            </span>
+          )}
+        </div>
+        <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5 text-xs">
+          {WINDOWS.map((w) => (
+            <button
+              key={w.label}
+              type="button"
+              aria-pressed={windowHours === w.hours}
+              onClick={() => setWindowHours(w.hours)}
+              className={`rounded-full px-2.5 py-1 ${
+                windowHours === w.hours ? "bg-leaf/20 text-leaf" : "text-slate-400"
+              }`}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <PlantHero twin={res} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {VITALS.map((v) => (
@@ -114,7 +184,7 @@ export function TwinDashboard({
             .then(setTwin)
             .catch(() => {});
           twinApi
-            .history(24)
+            .history(windowHours)
             .then(setHistory)
             .catch(() => {});
         }}

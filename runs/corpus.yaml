@@ -7,6 +7,7 @@ base:
   duration_days: 35          # full Cornell grow
   sample_interval_s: 600     # 10-min sampling -> ~5040 rows/grow
   ic_jitter: 0.12            # seed-driven distinct grows (not just noise)
+  ec_gain_jitter: 0.10       # +/-10% per-grow EC calibration gain -> calibration-invariance
 seeds: { count: 50, root: 20260610 }
 scenarios: [clean, clogged_pump_midgrow, drifting_ph_probe, sensor_dropouts, chaos, random]
 emit_csv: false

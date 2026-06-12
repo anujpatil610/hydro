@@ -25,6 +25,10 @@ class RunConfig(_Frozen):
     # Seed-driven initial-condition variation so each seed is a distinct grow
     # (not just different sensor noise). 0 = identical trajectory across seeds.
     ic_jitter: float = Field(default=0.12, ge=0)
+    # Per-grow EC calibration-gain domain randomization: each grow's ec/tds reads
+    # are scaled by a seed-drawn gain in [1-j, 1+j] so the model learns
+    # calibration-invariance. 0 = off (observed scale matches truth).
+    ec_gain_jitter: float = Field(default=0.0, ge=0)
 
 
 class BatchConfig(_Frozen):

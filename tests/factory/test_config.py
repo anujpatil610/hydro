@@ -8,6 +8,12 @@ def test_runconfig_defaults():
     assert rc.duration_days == 35
     assert rc.sample_interval_s == 600.0
     assert rc.integration_step_s == 300.0
+    assert rc.ec_gain_jitter == 0.0  # domain randomization off unless opted in
+
+
+def test_ec_gain_jitter_rejects_negative():
+    with pytest.raises(ValidationError):
+        RunConfig(profile="p.yaml", ec_gain_jitter=-0.1)
 
 
 def test_load_batch_reads_yaml(tmp_path):

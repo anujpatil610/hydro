@@ -40,6 +40,23 @@ def test_faults_flagged_in_row():
     assert row["fault_count"] >= 1
 
 
+def test_ec_cal_gain_lifts_observed_ec_channel_only(tmp_path):
+    # Same seed => identical noise draws; only the EC calibration gain differs, so
+    # ec_obs/tds_obs rise while ph_obs/temp_obs and the ec_true label are unchanged.
+    world = build_world(load_profile("profiles/bench-sim.yaml"), seed=5,
+                        sample_interval_s=600.0)
+    for _ in range(5):
+        world.step()
+    base = build_row(world, NoiseModel(seed=5), run_id="r", reservoir_id="resA")
+    gained = build_row(world, NoiseModel(seed=5, ec_cal_gain=1.10),
+                       run_id="r", reservoir_id="resA")
+    assert gained["ec_obs"] > base["ec_obs"]
+    assert gained["tds_obs"] > base["tds_obs"]
+    assert gained["ph_obs"] == base["ph_obs"]
+    assert gained["temp_obs"] == base["temp_obs"]
+    assert gained["ec_true"] == base["ec_true"]  # truth/label untouched by gain
+
+
 def test_schema_version_is_a_string():
     assert isinstance(SCHEMA_VERSION, str) and SCHEMA_VERSION
 

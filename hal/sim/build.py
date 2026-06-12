@@ -76,3 +76,14 @@ def build_world(profile: ProfileFile, *, seed: int = 0,
         sample_interval_s=sample_interval_s or float(poll),
     )
     return World(units=units, clock=clock, seed=seed, ic_jitter=ic_jitter)
+
+
+def reseed_world(world: World, profile: ProfileFile, *, seed: int,
+                 ic_jitter: float) -> None:
+    """Start the next grow in `world` in place, preserving clock cadence settings."""
+    fresh = build_world(
+        profile, seed=seed, ic_jitter=ic_jitter,
+        integration_step_s=world.clock.integration_step_s,
+        sample_interval_s=world.clock.sample_interval_s,
+    )
+    world.start_new_grow(fresh.units, seed=seed, ic_jitter=ic_jitter)

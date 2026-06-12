@@ -175,6 +175,17 @@ class World:
                 sim_time_s=self.clock.sim_time_s, reservoirs=reservoirs,
             )
 
+    def start_new_grow(self, units: dict[str, ReservoirUnit], *, seed: int,
+                       ic_jitter: float) -> None:
+        """In-place reset to a fresh grow: swap units, zero the clock, advance the
+        grow counter. Keeps the World object identity so wired sim devices stay valid."""
+        with self._lock:
+            self.units = units
+            self.clock.sim_time_s = 0.0
+            self.seed = seed
+            self.ic_jitter = ic_jitter
+            self.grow_id += 1
+
     def restore_state(self, state: WorldState) -> None:
         with self._lock:
             self.grow_id = state.grow_id

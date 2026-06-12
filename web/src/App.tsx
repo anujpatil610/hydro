@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { HistoryChart } from "./components/HistoryChart";
 import { ZoneSection } from "./components/ZoneSection";
+import { DatasetsView } from "./components/datasets/DatasetsView";
 import { TwinDashboard } from "./components/twin/TwinDashboard";
 import { api } from "./lib/api";
+import { datasetsApi } from "./lib/datasets";
 import type { Health, Reading, Topology } from "./lib/schema";
 import { buildLayout } from "./lib/topology";
 import { twinApi } from "./lib/twin";
@@ -15,7 +17,8 @@ export default function App() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [offline, setOffline] = useState(false);
   const [hasTwin, setHasTwin] = useState(false);
-  const [view, setView] = useState<"system" | "twin">("system");
+  const [hasDatasets, setHasDatasets] = useState(false);
+  const [view, setView] = useState<"system" | "twin" | "datasets">("system");
 
   // Boot probe: /twin returns null on non-sim backends (404).
   useEffect(() => {
@@ -27,6 +30,14 @@ export default function App() {
           setView("twin"); // sim mode: the grow view is the headline
         }
       })
+      .catch(() => {});
+  }, []);
+
+  // Boot probe: /datasets 404s (null) on hosts without factory output.
+  useEffect(() => {
+    datasetsApi
+      .list()
+      .then((b) => setHasDatasets(b !== null && b.length > 0))
       .catch(() => {});
   }, []);
 
@@ -72,9 +83,13 @@ export default function App() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          {hasTwin && (
+          {(hasTwin || hasDatasets) && (
             <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5 text-xs">
-              {(["twin", "system"] as const).map((v) => (
+              {[
+                ...(hasTwin ? (["twin"] as const) : []),
+                "system" as const,
+                ...(hasDatasets ? (["datasets"] as const) : []),
+              ].map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -83,7 +98,7 @@ export default function App() {
                     view === v ? "bg-leaf/20 text-leaf" : "text-slate-400"
                   }`}
                 >
-                  {v === "twin" ? "grow" : "system"}
+                  {v === "twin" ? "grow" : v}
                 </button>
               ))}
             </div>
@@ -103,7 +118,9 @@ export default function App() {
         </div>
       </header>
 
-      {view === "twin" && hasTwin ? (
+      {view === "datasets" ? (
+        <DatasetsView />
+      ) : view === "twin" && hasTwin ? (
         <TwinDashboard latest={latest} topology={topology} />
       ) : (
         <>

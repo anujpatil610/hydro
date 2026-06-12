@@ -76,9 +76,35 @@ export default function App() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold text-leaf">Hydro</h1>
-          <span className="text-sm text-slate-500">
+        <div className="flex items-baseline gap-3.5">
+          <h1 className="flex items-center gap-2.5 font-mono text-base font-semibold tracking-[0.2em] text-slate-100">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+              className="text-leaf"
+            >
+              <path
+                d="M10 1 C 14 6, 17 9, 17 13 a 7 7 0 1 1 -14 0 C 3 9, 6 6, 10 1 Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10 17 V 9 M 10 12 L 7 9.5 M 10 10.5 L 13 8"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+            HYDRO
+          </h1>
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-leaf">
+            digital twin
+          </span>
+          <span className="hidden text-sm text-slate-500 sm:inline">
             {topology ? topology.profile.name : "hydroponics controller"}
           </span>
         </div>
@@ -105,15 +131,18 @@ export default function App() {
             </div>
           )}
           {health && (
-            <span className="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-slate-300">
+            <span className="rounded-full border border-ink-700 bg-ink-800 px-3 py-1 font-mono text-[11px] text-slate-300">
               {health.tier} · mode: <span className="text-blueprint">{health.mode}</span>
             </span>
           )}
           <span
-            className={`rounded-full px-3 py-1 ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] ${
               offline ? "bg-amber-400/20 text-amber-400" : "bg-leaf/20 text-leaf"
             }`}
           >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${offline ? "bg-amber-400" : "pulse-dot bg-leaf"}`}
+            />
             {offline ? "offline" : "live"}
           </span>
         </div>

@@ -43,23 +43,27 @@ export function HistoryChart({ devices, history }: Props) {
         <h2 className="text-sm font-medium uppercase tracking-wide text-slate-400">
           History (24h)
         </h2>
-        <select
-          value={deviceId}
-          onChange={(e) => setDeviceId(e.target.value)}
-          className="rounded-md border border-ink-700 bg-ink-900 px-3 py-1 text-xs text-slate-200 focus:border-blueprint focus:outline-none"
-        >
-          {devices.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.id}
-            </option>
-          ))}
-        </select>
+        {devices.length > 0 && (
+          <select
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+            className="rounded-md border border-ink-700 bg-ink-900 px-3 py-1 text-xs text-slate-200 focus:border-blueprint focus:outline-none"
+          >
+            {devices.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.id} · {d.kind}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="h-64">
         {data.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-slate-500">
-            No data yet
+            {devices.length === 0
+              ? "No sensors in the topology yet — waiting for the service."
+              : "No readings in the window yet — first poll lands within 10 s."}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

@@ -7,10 +7,47 @@
 }
 
 body {
-  @apply bg-ink-900 text-slate-200 font-sans antialiased;
+  @apply bg-ink-950 text-slate-200 font-sans antialiased;
+  /* "High-Tech Earth": a faint blueprint grid over deep carbon, with a
+     leaf-green glow top-right and a blueprint wash bottom-left. */
+  background-image: linear-gradient(#0d141b 1px, transparent 1px),
+    linear-gradient(90deg, #0d141b 1px, transparent 1px),
+    radial-gradient(1100px 700px at 85% -10%, rgba(110, 231, 160, 0.06), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(122, 200, 255, 0.05), transparent 60%);
+  background-size: 44px 44px, 44px 44px, auto, auto;
+  background-attachment: fixed;
+}
+
+/* Film grain so large dark surfaces don't band. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: rgba(110, 231, 160, 0.25);
 }
 
 /* Tabular figures so live numeric readings don't jitter as digits change. */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes hydroPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse-dot {
+  animation: hydroPulse 2s infinite;
 }

@@ -40,11 +40,31 @@ class ReservoirUnit:
     zone: Zone
 
 
+@dataclass(frozen=True)
+class WorldState:
+    """Restart-safe snapshot of a World's mutable dynamical state. Static config
+    (zone setpoints, EC coeffs, crop) is reproduced by build_world(seed, ic_jitter)."""
+    grow_id: int
+    seed: int
+    ic_jitter: float
+    sim_time_s: float
+    reservoirs: dict[str, dict[str, float]]
+
+
+_LIVE_FIELDS = (
+    "biomass_g", "days_elapsed", "health", "n_mass_mg", "p_mass_mg",
+    "k_mass_mg", "acc_mass_mg", "ph", "temp_c", "volume_l",
+)
+
+
 @dataclass(slots=True)
 class World:
     units: dict[str, ReservoirUnit]
     clock: SimClock
     _lock: threading.RLock = field(default_factory=threading.RLock)
+    seed: int = 0
+    ic_jitter: float = 0.0
+    grow_id: int = 1
 
     def step(self) -> None:
         """Advance every unit by one sample interval."""
@@ -137,3 +157,42 @@ class World:
                 "p_mass_mg": u.reservoir.p_mass_mg,
                 "k_mass_mg": u.reservoir.k_mass_mg,
             }
+
+    def to_state(self) -> WorldState:
+        with self._lock:
+            reservoirs: dict[str, dict[str, float]] = {}
+            for rid, u in self.units.items():
+                r, p = u.reservoir, u.plant
+                reservoirs[rid] = {
+                    "biomass_g": p.biomass_g, "days_elapsed": p.days_elapsed,
+                    "health": p.health, "n_mass_mg": r.n_mass_mg,
+                    "p_mass_mg": r.p_mass_mg, "k_mass_mg": r.k_mass_mg,
+                    "acc_mass_mg": r.acc_mass_mg, "ph": r.ph,
+                    "temp_c": r.temp_c, "volume_l": r.volume_l,
+                }
+            return WorldState(
+                grow_id=self.grow_id, seed=self.seed, ic_jitter=self.ic_jitter,
+                sim_time_s=self.clock.sim_time_s, reservoirs=reservoirs,
+            )
+
+    def restore_state(self, state: WorldState) -> None:
+        with self._lock:
+            self.grow_id = state.grow_id
+            self.seed = state.seed
+            self.ic_jitter = state.ic_jitter
+            self.clock.sim_time_s = state.sim_time_s
+            for rid, f in state.reservoirs.items():
+                u = self.units.get(rid)
+                if u is None:
+                    continue
+                r, p = u.reservoir, u.plant
+                p.biomass_g = f["biomass_g"]
+                p.days_elapsed = f["days_elapsed"]
+                p.health = f["health"]
+                r.n_mass_mg = f["n_mass_mg"]
+                r.p_mass_mg = f["p_mass_mg"]
+                r.k_mass_mg = f["k_mass_mg"]
+                r.acc_mass_mg = f["acc_mass_mg"]
+                r.ph = f["ph"]
+                r.temp_c = f["temp_c"]
+                r.volume_l = f["volume_l"]

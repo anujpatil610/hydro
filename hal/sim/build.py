@@ -75,4 +75,4 @@ def build_world(profile: ProfileFile, *, seed: int = 0,
         integration_step_s=integration_step_s,
         sample_interval_s=sample_interval_s or float(poll),
     )
-    return World(units=units, clock=clock)
+    return World(units=units, clock=clock, seed=seed, ic_jitter=ic_jitter)

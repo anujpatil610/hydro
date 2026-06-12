@@ -26,7 +26,7 @@ def test_end_to_end_small_corpus(tmp_path):
     import numpy as np
 
     # all three binding gate criteria were evaluated (not just one)
-    for k in ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only"):
+    for k in ("biomass_beats_time_only", "health_beats_time_only", "stage_recovered_by_sensors"):
         assert k in report.gate.criteria
 
     bundle = load_bundle(str(art), strict=True)

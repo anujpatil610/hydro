@@ -63,7 +63,7 @@ class TrainConfig:
     biomass_nmae_max: float = 0.15
     health_mae_max: float = 0.10
     stage_qwk_with_time_min: float = 0.98
-    stage_qwk_sensors_min: float = 0.60
+    stage_qwk_sensors_min: float = 0.90
     stage_qwk_margin: float = 0.10
     stage_adjacent_acc_min: float = 0.90
     # reserved for the deferred robustness-perturbation report

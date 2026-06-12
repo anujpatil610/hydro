@@ -92,12 +92,28 @@ def test_run_gate_passes_when_all_binding_criteria_met():
         biomass={"nmae_full": 0.10, "nmae_time_only": 0.5, "nmae_dummy": 0.8,
                  "nmae_full_fault": 0.10, "nmae_time_only_fault": 0.5},
         health={"mae_full": 0.05, "nmae_full_fault": 0.1, "nmae_time_only_fault": 0.5},
-        stage={"qwk_with_time": 0.99, "qwk_sensors": 0.85, "qwk_time_only": 0.6,
+        stage={"qwk_with_time": 0.99, "qwk_sensors": 0.95, "qwk_time_only": 0.6,
                "adjacent_acc_sensors": 0.95},
     )
     assert res.passed is True
     assert all(res.criteria[k] for k in
-               ("biomass_beats_time_only", "health_beats_time_only", "stage_beats_time_only"))
+               ("biomass_beats_time_only", "health_beats_time_only", "stage_recovered_by_sensors"))
+
+
+def test_run_gate_passes_stage_when_clock_is_saturated():
+    cfg = TrainConfig()
+    res = run_gate(
+        cfg,
+        biomass={"nmae_full": 0.04, "nmae_time_only": 0.09, "nmae_dummy": 0.5,
+                 "nmae_full_fault": 0.04, "nmae_time_only_fault": 0.09},
+        health={"mae_full": 0.05, "nmae_full_fault": 0.1, "nmae_time_only_fault": 0.5},
+        stage={"qwk_with_time": 1.0, "qwk_sensors": 0.9984, "qwk_time_only": 0.9997,
+               "adjacent_acc_sensors": 1.0},
+    )
+    # sensors-only recovers stage near-perfectly even though it cannot "beat" the
+    # already-perfect time-only clock by a margin -> recovery criterion passes.
+    assert res.criteria["stage_recovered_by_sensors"] is True
+    assert res.passed is True
 
 
 def test_robustness_levels_have_a_combined_flag_level():

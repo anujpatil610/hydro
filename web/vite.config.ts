@@ -12,6 +12,7 @@ export default defineConfig({
       "/actuators": "http://localhost:8000",
       "/twin": "http://localhost:8000",
       "/datasets": "http://localhost:8000",
+      "/topology": "http://localhost:8000",
     },
   },
   build: {

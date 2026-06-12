@@ -20,6 +20,16 @@ dummy proves nothing — only beating a model that already knows elapsed time sh
 the *sensors* carry recoverable state. See
 `docs/superpowers/specs/2026-06-10-sim-ml-state-estimation-design.md`.
 
+## Calibration-invariance (corpus-side domain randomization)
+
+`runs/corpus.yaml` sets `ec_gain_jitter: 0.10`, so each grow is generated with a
+fixed, seed-drawn EC calibration gain in ±10% applied to its observed `ec`/`tds`
+channels only (truth/labels untouched). The model therefore trains across many EC
+scales and learns to be invariant to probe calibration rather than memorizing one
+scale — which is what the `ec_gain`/`combined` robustness-probe levels test for.
+Set `ec_gain_jitter: 0.0` to regenerate a fixed-scale corpus. See
+`docs/superpowers/specs/2026-06-12-sim-ml-ec-gain-domain-randomization-design.md`.
+
 ## Artifacts
 
 `artifacts/<id>/`: `biomass|health|stage.joblib`, `preprocessor.joblib`
@@ -28,4 +38,5 @@ the *sensors* carry recoverable state. See
 `metrics.json` and `report.md` include `ablation`, `robustness`, and `loso` sections
 when `run_eval_extras=True` (the default).
 Deferred to follow-on: quantile intervals, classifier calibration, ONNX/skops,
-corpus-side domain randomization, Pi deployment (C1-deploy).
+domain randomization of noise σ / pH offset (EC-gain randomization shipped),
+Pi deployment (C1-deploy).

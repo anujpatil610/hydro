@@ -219,7 +219,7 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 
 | # | Gap | In-scope-now mitigation | Follow-on |
 |---|---|---|---|
-| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | Robustness-perturbation report (advisory `robustness_ok` flag) — shipped | Corpus-side domain randomization of noise/offset/gain |
+| 1 | **Sensor-noise model** — sim noise may be Gaussian/stationary; real probes drift, foul, and respond to temperature | Robustness-perturbation report (advisory `robustness_ok` flag) — shipped; **corpus-side EC-gain domain randomization** (per-grow ±10% calibration gain) — shipped, see `2026-06-12-sim-ml-ec-gain-domain-randomization-design.md` | Extend domain randomization to noise σ / pH offset |
 | 2 | **Calibration/units gap** — real `ph_obs`/`ec_obs` need per-probe calibration | Preprocessor documents expected units/ranges; manifest records them | Per-probe calibration step at deploy |
 | 3 | **Unmodeled real dynamics** — cultivar, light spectrum, disease absent from the ODE | LOSO report flags regime sensitivity | Expand the twin / collect real edge cases |
 | 4 | **Covariate shift** detectable at deploy | — | Two-sample / domain-classifier shift check (real feature dist vs. corpus) before trusting predictions |
@@ -233,12 +233,12 @@ The north star is transfer to a real farm. The concrete gaps and their planned h
 - **Quantile prediction intervals** (P5/P95 biomass) — deferred; would add two models per target.
 - **Probability calibration** of the stage classifier (`CalibratedClassifierCV`) — deferred; the gate scores argmax (macro-F1/QWK), which calibration does not change. Recipe (prefit on the val fold, isotonic) recorded for when stage probabilities surface to UI/control.
 - **`skops.io`** secure persistence and **ONNX** export — deferred (joblib + version pinning + trust note suffices for a first slice).
-- **Corpus-side domain randomization** of sensor parameters — deferred (touches B's factory); risk #1 above.
+- **Corpus-side domain randomization** of sensor parameters — EC calibration gain shipped (risk #1; `2026-06-12-sim-ml-ec-gain-domain-randomization-design.md`); noise σ / pH offset still deferred.
 - Online/incremental learning; the corpus is generated once and trained offline.
 
 **Shipped after the first slice (run when `run_eval_extras=True`, the default):** the full ablation table (full / sensors-only / time-only / dummy per target), the robustness-perturbation report (biomass MAE degradation across noise/offset/gain levels, surfaced as an advisory non-binding `robustness_ok` gate flag), and the leave-one-scenario-out (LOSO) report.
 
-**Still deferred (follow-on):** a separate feature-name-list sha256 and an embedded `requirements.lock` in the manifest (the versions block already pins the inference-critical libraries); corpus-side domain randomization; quantile intervals; classifier calibration; ONNX/skops; Pi deployment (C1-deploy).
+**Still deferred (follow-on):** a separate feature-name-list sha256 and an embedded `requirements.lock` in the manifest (the versions block already pins the inference-critical libraries); domain randomization of noise σ / pH offset (EC-gain randomization shipped); quantile intervals; classifier calibration; ONNX/skops; Pi deployment (C1-deploy). Revisit the advisory `robustness_ok` 2.0× band once a full-corpus train measures the post-randomization `ec_gain`/`combined` ratios.
 
 ## Testing
 

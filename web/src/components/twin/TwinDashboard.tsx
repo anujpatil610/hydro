@@ -51,6 +51,10 @@ const WINDOWS = [
   { label: "7d", hours: 168 },
 ] as const;
 
+// Time-lapse presets: ×360 renders a 35-day grow in ~2.3h, ×1440 in ~35 min
+// (10s poll). Applied at the next poll via POST /twin/speed.
+const SPEEDS = [1, 60, 360, 1440] as const;
+
 export function TwinDashboard({
   latest,
   topology,
@@ -62,6 +66,7 @@ export function TwinDashboard({
   const [history, setHistory] = useState<TwinSample[]>([]);
   const [windowHours, setWindowHours] = useState<number>(24);
   const [twinError, setTwinError] = useState(false);
+  const [speedBusy, setSpeedBusy] = useState(false);
 
   useInterval(() => {
     twinApi
@@ -91,6 +96,17 @@ export function TwinDashboard({
       .catch(() => {});
   }, 30000);
 
+  const setSpeed = (speed: number) => {
+    setSpeedBusy(true);
+    twinApi
+      .setSpeed(speed)
+      .then((applied) => {
+        setTwin((t) => (t ? { ...t, sim_speed: applied } : t));
+      })
+      .catch(() => {})
+      .finally(() => setSpeedBusy(false));
+  };
+
   const res = twin?.reservoirs[0] ?? null;
   const observedByKind = useMemo(() => {
     const map = new Map<string, number>();
@@ -117,45 +133,77 @@ export function TwinDashboard({
     );
   }
   const resHistory = history.filter((h) => h.reservoir_id === res.reservoir_id);
+  const simSpeed = twin?.sim_speed ?? 1;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <span className="text-lg font-semibold text-slate-100">
-            Day {Math.floor(res.days_elapsed) + 1}
-            <span className="text-sm font-normal text-slate-500"> of {res.harvest_day}</span>
+            Day <span className="font-mono tnum">{Math.floor(res.days_elapsed) + 1}</span>
+            <span className="text-sm font-normal text-slate-500">
+              {" "}
+              of <span className="font-mono tnum">{res.harvest_day}</span>
+            </span>
           </span>
-          {twin && twin.sim_speed !== 1 && (
-            <span className="rounded-full bg-blueprint/15 px-2 py-0.5 text-xs text-blueprint">
-              time-lapse ×{twin.sim_speed}
+          {simSpeed !== 1 && (
+            <span className="rounded-full bg-blueprint/15 px-2 py-0.5 font-mono text-[11px] text-blueprint">
+              time-lapse ×{simSpeed}
             </span>
           )}
           {twinError ? (
-            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-400">
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 font-mono text-[11px] text-amber-400">
               connection lost — showing last data
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-xs text-leaf">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-leaf" />
+            <span className="flex items-center gap-1.5 font-mono text-[11px] text-leaf">
+              <span className="pulse-dot h-2 w-2 rounded-full bg-leaf" />
               live
             </span>
           )}
         </div>
-        <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5 text-xs">
-          {WINDOWS.map((w) => (
-            <button
-              key={w.label}
-              type="button"
-              aria-pressed={windowHours === w.hours}
-              onClick={() => setWindowHours(w.hours)}
-              className={`rounded-full px-2.5 py-1 ${
-                windowHours === w.hours ? "bg-leaf/20 text-leaf" : "text-slate-400"
-              }`}
-            >
-              {w.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#566370]">
+              lapse
+            </span>
+            <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={simSpeed === s}
+                  disabled={speedBusy}
+                  onClick={() => setSpeed(s)}
+                  className={`rounded-full px-2.5 py-1 font-mono text-[11px] disabled:opacity-60 ${
+                    simSpeed === s ? "bg-blueprint/20 text-blueprint" : "text-slate-400"
+                  }`}
+                >
+                  ×{s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#566370]">
+              window
+            </span>
+            <div className="flex rounded-full border border-ink-700 bg-ink-800 p-0.5">
+              {WINDOWS.map((w) => (
+                <button
+                  key={w.label}
+                  type="button"
+                  aria-pressed={windowHours === w.hours}
+                  onClick={() => setWindowHours(w.hours)}
+                  className={`rounded-full px-2.5 py-1 font-mono text-[11px] ${
+                    windowHours === w.hours ? "bg-leaf/20 text-leaf" : "text-slate-400"
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
       <PlantHero twin={res} />

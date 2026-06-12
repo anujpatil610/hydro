@@ -37,9 +37,11 @@ export function EventTimeline({ history }: { history: TwinSample[] }) {
   const events = deriveEvents(history);
   return (
     <div className="rounded-2xl border border-ink-700 bg-ink-800 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-300">Events</h3>
+      <h3 className="mb-3 text-[13px] font-semibold text-slate-300">Events</h3>
       {events.length === 0 ? (
-        <p className="text-xs text-slate-500">No stage changes or faults in the window yet.</p>
+        <p className="text-xs text-slate-500">
+          Quiet so far — stage changes and faults will land here.
+        </p>
       ) : (
         <ol className="space-y-1.5">
           {events
@@ -47,7 +49,7 @@ export function EventTimeline({ history }: { history: TwinSample[] }) {
             .reverse()
             .map((e) => (
               <li key={`${e.ts}-${e.kind}-${e.label}`} className="flex items-center gap-2 text-xs">
-                <span className="w-12 text-slate-500">{e.ts.slice(11, 16)}</span>
+                <span className="w-16 font-mono tnum text-slate-500">{e.ts.slice(11, 19)}</span>
                 <span className={`rounded-full px-2 py-0.5 ${STYLE[e.kind]}`}>
                   {e.kind === "stage"
                     ? `→ ${e.label}`

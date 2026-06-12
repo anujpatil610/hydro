@@ -53,6 +53,16 @@ class World:
                 self._step_unit(unit)
             self.clock.advance(self.clock.sample_interval_s)
 
+    def set_speed(self, speed: float, poll_seconds: float) -> None:
+        """Change the time-lapse speed at runtime. Takes the step lock so the
+        clock never changes mid-integration; the new sample interval applies
+        from the next poll."""
+        if speed <= 0:
+            raise ValueError("speed must be positive")
+        with self._lock:
+            self.clock.speed = speed
+            self.clock.sample_interval_s = poll_seconds * speed
+
     def _step_unit(self, u: ReservoirUnit) -> None:
         interval = self.clock.sample_interval_s
         for (t0, t1) in self.clock.steps_for(interval):

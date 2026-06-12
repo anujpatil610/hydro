@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from service.db.models import TwinSampleOut, npk_mg_l
@@ -163,3 +163,21 @@ def get_twin_history(
     with Session(request.app.state.engine) as session:
         rows = twin_history(session, hours, reservoir_id=reservoir_id)
     return [TwinSampleOut.model_validate(r, from_attributes=True) for r in rows]
+
+
+class SpeedIn(BaseModel):
+    # 1440x renders a full 35-day grow in ~35 wall-minutes at a 10s poll.
+    speed: float = Field(gt=0, le=1440)
+
+
+class SpeedOut(BaseModel):
+    sim_speed: float
+
+
+@router.post("/speed", response_model=SpeedOut)
+def set_speed(request: Request, body: SpeedIn) -> SpeedOut:
+    """Runtime time-lapse control (sim only). Applies from the next poll;
+    HYDRO_SIM_SPEED still sets the boot default."""
+    world = _world_or_404(request)
+    world.set_speed(body.speed, request.app.state.profile.profile.poll_seconds)
+    return SpeedOut(sim_speed=world.clock.speed)

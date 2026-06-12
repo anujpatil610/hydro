@@ -23,19 +23,33 @@ export function DatasetsView() {
 
   useEffect(() => {
     if (!selected) return;
+    let cancelled = false;
+    setError(false);
     setDetail(null);
     setSelectedRun(null);
     datasetsApi
       .detail(selected)
-      .then(setDetail)
-      .catch(() => setError(true));
+      .then((d) => !cancelled && setDetail(d))
+      .catch(() => !cancelled && setError(true));
+    return () => {
+      cancelled = true;
+    };
   }, [selected]);
 
   const okRuns = useMemo(() => detail?.runs.filter((r) => r.status === "ok") ?? [], [detail]);
-  const scenarios = useMemo(() => [...new Set(okRuns.map((r) => r.scenario))], [okRuns]);
+  const runsByScenario = useMemo(() => {
+    const map = new Map<string, typeof okRuns>();
+    for (const r of okRuns) {
+      const list = map.get(r.scenario);
+      if (list) list.push(r);
+      else map.set(r.scenario, [r]);
+    }
+    return map;
+  }, [okRuns]);
   const runForDetail = okRuns.find((r) => r.dir === selectedRun) ?? null;
 
-  if (error) return <p className="text-sm text-red-400">Failed to load datasets.</p>;
+  if (error && batches === null)
+    return <p className="text-sm text-red-400">Failed to load datasets.</p>;
   if (batches === null) return <p className="text-sm text-slate-500">Loading datasets…</p>;
   if (batches.length === 0)
     return (
@@ -55,6 +69,7 @@ export function DatasetsView() {
             key={b.name}
             type="button"
             onClick={() => setSelected(b.name)}
+            aria-pressed={selected === b.name}
             className={`rounded-full border px-3 py-1.5 text-xs ${
               selected === b.name
                 ? "border-leaf/60 bg-leaf/10 text-leaf"
@@ -68,15 +83,17 @@ export function DatasetsView() {
           </button>
         ))}
       </div>
-      {detail === null ? (
+      {error ? (
+        <p className="text-sm text-red-400">Failed to load batch.</p>
+      ) : detail === null ? (
         <p className="text-sm text-slate-500">Loading batch…</p>
       ) : (
         <>
-          {scenarios.map((sc) => (
+          {[...runsByScenario.entries()].map(([sc, runs]) => (
             <DiversityChart
               key={sc}
               batchName={detail.name}
-              runs={okRuns.filter((r) => r.scenario === sc)}
+              runs={runs}
               title={`Seed diversity — ${sc}`}
             />
           ))}

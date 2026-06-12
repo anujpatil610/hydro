@@ -94,6 +94,7 @@ export function RunDetail({ batchName, run }: Props) {
   useEffect(() => {
     let cancelled = false;
     setError(false);
+    setRows([]);
     datasetsApi
       .series(batchName, run.dir, COLS, { stride: 8 })
       .then((s) => !cancelled && setRows(toRows(s)))

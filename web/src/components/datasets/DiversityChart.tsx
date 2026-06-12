@@ -43,6 +43,7 @@ export function DiversityChart({ batchName, runs, title }: Props) {
   useEffect(() => {
     let cancelled = false;
     setError(false);
+    setData([]);
     Promise.all(runs.map((r) => datasetsApi.series(batchName, r.dir, [metric], { stride: 8 })))
       .then((seriesList) => {
         if (cancelled) return;
@@ -52,7 +53,7 @@ export function DiversityChart({ batchName, runs, title }: Props) {
         for (let i = 0; i < longest; i++) {
           const row: Row = { day: seriesList[0]?.columns.day[i] ?? i };
           seriesList.forEach((s, j) => {
-            const v = s.columns[metric][i];
+            const v = s.columns[metric]?.[i];
             if (v !== undefined) row[`seed${runs[j].seed}`] = v;
           });
           rows.push(row);
@@ -75,6 +76,7 @@ export function DiversityChart({ batchName, runs, title }: Props) {
               key={m.key}
               type="button"
               onClick={() => setMetric(m.key)}
+              aria-pressed={metric === m.key}
               className={`rounded-full px-2.5 py-1 ${
                 metric === m.key ? "bg-leaf/20 text-leaf" : "text-slate-400"
               }`}
@@ -86,6 +88,8 @@ export function DiversityChart({ batchName, runs, title }: Props) {
       </div>
       {error ? (
         <p className="text-xs text-red-400">failed to load series</p>
+      ) : data.length === 0 ? (
+        <p className="text-xs text-slate-500">loading…</p>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>

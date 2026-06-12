@@ -94,6 +94,7 @@ export default function App() {
                   key={v}
                   type="button"
                   onClick={() => setView(v)}
+                  aria-pressed={view === v}
                   className={`rounded-full px-3 py-1 capitalize ${
                     view === v ? "bg-leaf/20 text-leaf" : "text-slate-400"
                   }`}

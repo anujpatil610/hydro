@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from numpy.lib.stride_tricks import sliding_window_view
 
 from ml.config import OBSERVED_COLS, STAGE_TO_CODE, TrainConfig
 from ml.data.loading import Grow
@@ -48,28 +49,44 @@ def _slope(window: np.ndarray) -> float:
 
 
 def _window_block(series: pd.Series, windows: tuple[int, ...]) -> dict[str, np.ndarray]:
-    """level (last), and per-window slope/std/mean_abs_change/dropout-rate."""
+    """level (last), and per-window slope/std/mean_abs_change/dropout-rate.
+
+    Vectorized: full backward windows via sliding_window_view (C-speed); the first
+    w-1 partial-window rows (always dropped as warmup) are filled by a tiny loop
+    that matches the per-row definitions exactly."""
     vals = series.to_numpy(dtype=float)
-    out: dict[str, np.ndarray] = {f"{series.name}_last": vals.copy()}
     n = len(vals)
+    name = str(series.name)
+    out: dict[str, np.ndarray] = {f"{name}_last": vals.copy()}
     for w in windows:
         slope = np.zeros(n)
         std = np.zeros(n)
-        mac = np.zeros(n)        # mean absolute step-to-step change (robust volatility)
-        dropout = np.zeros(n)    # fraction of repeated (flatline) samples in the window
-        # O(n*w) per sensor/window; fine for one-time offline corpus build (vectorize if it grows).
-        for i in range(n):
-            lo = max(0, i - w + 1)
-            win = vals[lo : i + 1]
-            slope[i] = _slope(win)
-            std[i] = float(win.std()) if len(win) > 1 else 0.0
-            d = np.abs(np.diff(win)) if len(win) > 1 else np.array([0.0])
-            mac[i] = float(d.mean())
-            dropout[i] = float((d == 0.0).mean())
-        out[f"{series.name}_slope_{w}"] = slope
-        out[f"{series.name}_std_{w}"] = std
-        out[f"{series.name}_mac_{w}"] = mac
-        out[f"{series.name}_dropout_{w}"] = dropout
+        mac = np.zeros(n)
+        dropout = np.zeros(n)
+        if n >= w:
+            win = sliding_window_view(vals, w)  # (n-w+1, w); row j ends at output row j+w-1
+            x = np.arange(w, dtype=float) - (w - 1) / 2.0
+            denom = float((x * x).sum())
+            if denom > 0.0:
+                slope[w - 1:] = win @ x / denom
+            std[w - 1:] = win.std(axis=1)
+            if w > 1:
+                d = np.abs(np.diff(win, axis=1))  # (n-w+1, w-1)
+                mac[w - 1:] = d.mean(axis=1)
+                dropout[w - 1:] = (d == 0.0).mean(axis=1)
+            else:
+                dropout[w - 1:] = 1.0  # single-sample window is trivially "flat"
+        for i in range(min(w - 1, n)):  # partial warmup rows (dropped downstream)
+            sub = vals[max(0, i - w + 1): i + 1]
+            slope[i] = _slope(sub)
+            std[i] = float(sub.std()) if len(sub) > 1 else 0.0
+            dd = np.abs(np.diff(sub)) if len(sub) > 1 else np.array([0.0])
+            mac[i] = float(dd.mean())
+            dropout[i] = float((dd == 0.0).mean())
+        out[f"{name}_slope_{w}"] = slope
+        out[f"{name}_std_{w}"] = std
+        out[f"{name}_mac_{w}"] = mac
+        out[f"{name}_dropout_{w}"] = dropout
     return out
 
 

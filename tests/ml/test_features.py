@@ -106,3 +106,34 @@ def test_monotone_features_are_cumulative_and_time():
     }
     fb = build_features([_synthetic_grow(n=40)], TrainConfig(windows=(4, 8)))
     assert MONOTONE_FEATURES <= set(fb.X.columns)
+
+
+def test_vectorized_windows_match_reference_loop():
+    from ml.data.features import _window_block
+
+    rng = np.random.default_rng(0)
+    vals = pd.Series(rng.normal(size=200), name="ec_obs")
+    windows = (5, 24)
+    out = _window_block(vals, windows)
+    v = vals.to_numpy(float)
+    n = len(v)
+
+    def ref_slope(win):
+        m = len(win)
+        if m < 2:
+            return 0.0
+        x = np.arange(m, dtype=float)
+        x -= x.mean()
+        den = float((x * x).sum())
+        return 0.0 if den == 0 else float((x * (win - win.mean())).sum() / den)
+
+    for w in windows:
+        for i in range(n):
+            sub = v[max(0, i - w + 1): i + 1]
+            d = np.abs(np.diff(sub)) if len(sub) > 1 else np.array([0.0])
+            assert abs(out[f"ec_obs_slope_{w}"][i] - ref_slope(sub)) < 1e-9, (w, i, "slope")
+            exp_std = float(sub.std()) if len(sub) > 1 else 0.0
+            assert abs(out[f"ec_obs_std_{w}"][i] - exp_std) < 1e-9
+            assert abs(out[f"ec_obs_mac_{w}"][i] - float(d.mean())) < 1e-9
+            assert abs(out[f"ec_obs_dropout_{w}"][i] - float((d == 0.0).mean())) < 1e-9
+    assert np.array_equal(out["ec_obs_last"], v)

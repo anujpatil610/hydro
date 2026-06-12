@@ -86,6 +86,17 @@ carry the observed track (model inputs), the hidden truth track (labels), and an
 event/fault track — the contract Sub-project C trains on. Reproducible by seed,
 CPU-only. Design: `docs/superpowers/specs/2026-06-09-sim-data-factory-design.md`.
 
+### Sub-project C — offline state estimation (ml/)
+
+`ml/` trains scikit-learn gradient-boosted models on the synthetic corpus to
+estimate hidden plant state (biomass, health, stage) from observed sensors. The
+models must beat a **time-only baseline**, proving that the sensor streams carry
+recoverable state — the precondition for transfer to real farms. Runs offline
+(CPU-only); artifacts are saved joblib bundles for later deployment. Covers C0
+(corpus generation + feature engineering) and C1 (model training + evaluation).
+Design: `docs/superpowers/specs/2026-06-10-sim-ml-state-estimation-design.md`.
+See `ml/README.md` for usage.
+
 ### Layer 4 — rules engine (Phase 3)
 
 Design locked in `PHASE3_PLAN.md` (defaults derived in `PHASE3_RESEARCH.md`;

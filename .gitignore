@@ -23,3 +23,7 @@ web/dist/
 .vscode/
 .idea/
 .DS_Store
+
+# ML corpus + trained artifacts (large / regenerable)
+data/datasets/
+artifacts/

@@ -1,0 +1,4 @@
+[     356ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8000/favicon.ico:0
+[  576325ms] [ERROR] Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES @ http://127.0.0.1:8000/health:0
+[  577339ms] [ERROR] Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES @ http://127.0.0.1:8000/sensors:0
+[ 3346888ms] [ERROR] Failed to load resource: net::ERR_NO_BUFFER_SPACE @ http://127.0.0.1:8000/sensors:0

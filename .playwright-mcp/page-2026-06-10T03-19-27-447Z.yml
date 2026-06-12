@@ -1,0 +1,12 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Hydro" [level=1] [ref=e6]
+      - generic [ref=e7]: Dev Bench (sim)
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "grow" [ref=e10] [cursor=pointer]
+        - button "system" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]: "bench · mode: sim"
+      - generic [ref=e13]: live
+  - paragraph [ref=e14]: Twin state loading…

@@ -77,4 +77,16 @@ export const twinApi = {
     if (reservoirId) params.set("reservoir_id", reservoirId);
     return getJson(`/twin/history?${params}`, twinHistorySchema);
   },
+  // Runtime time-lapse control (sim only); resolves to the applied speed.
+  setSpeed: async (speed: number): Promise<number> => {
+    const res = await fetch("/twin/speed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speed }),
+    });
+    if (!res.ok) {
+      throw new Error(`/twin/speed -> ${res.status}`);
+    }
+    return z.object({ sim_speed: z.number() }).parse(await res.json()).sim_speed;
+  },
 };

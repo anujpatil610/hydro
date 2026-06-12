@@ -59,6 +59,26 @@ def test_twin_history_returns_persisted_rows(sim_client):
             "n_mg_l", "p_mg_l", "k_mg_l", "stage", "faults"} <= set(rows[0])
 
 
+def test_set_speed_404_when_not_sim(mock_client):
+    assert mock_client.post("/twin/speed", json={"speed": 60}).status_code == 404
+
+
+def test_set_speed_applies_to_clock(sim_client):
+    r = sim_client.post("/twin/speed", json={"speed": 360})
+    assert r.status_code == 200
+    assert r.json() == {"sim_speed": 360.0}
+    world = sim_client.app.state.device_set.world
+    poll = sim_client.app.state.profile.profile.poll_seconds
+    assert world.clock.speed == 360.0
+    assert world.clock.sample_interval_s == poll * 360.0
+    assert sim_client.get("/twin").json()["sim_speed"] == 360.0
+
+
+def test_set_speed_validates_bounds(sim_client):
+    assert sim_client.post("/twin/speed", json={"speed": 0}).status_code == 422
+    assert sim_client.post("/twin/speed", json={"speed": 99999}).status_code == 422
+
+
 def test_stage_progress_math():
     from service.api.twin import stage_progress
 

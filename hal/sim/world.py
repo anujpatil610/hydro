@@ -133,6 +133,20 @@ class World:
     def _truth(self, u: ReservoirUnit) -> dict[str, float]:
         return {"ph": u.reservoir.ph, "ec": u.reservoir.ec(), "temp": u.reservoir.temp_c}
 
+    def harvest_day(self) -> int:
+        """Largest harvest horizon (sum of stage days) across reservoirs."""
+        return max(
+            sum(s.days for s in u.plant.crop.stages) for u in self.units.values()
+        )
+
+    def harvest_ready(self) -> bool:
+        with self._lock:
+            for u in self.units.values():
+                harvest = sum(s.days for s in u.plant.crop.stages)
+                if u.plant.days_elapsed >= harvest:
+                    return True
+            return False
+
     def dose(self, reservoir_id: str, *, role: str, ml: float) -> None:
         with self._lock:
             r = self.units[reservoir_id].reservoir

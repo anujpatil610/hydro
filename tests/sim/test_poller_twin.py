@@ -20,7 +20,13 @@ def engine(tmp_path):
 
 def _poller(profile_path: str, engine) -> Poller:
     ds = build_device_set(load_profile(profile_path))
-    return Poller(ds, engine, poll_seconds=1, retention_hours=24)
+    # History cadence == the sim sample interval so one TwinSample is written
+    # per poll (this test predates decimation; it asserts a per-tick write).
+    interval = ds.world.clock.sample_interval_s if ds.world is not None else 10.0
+    return Poller(
+        ds, engine, poll_seconds=1, retention_hours=24,
+        twin_history_seconds=interval,
+    )
 
 
 def test_sample_once_persists_twin_samples(engine) -> None:

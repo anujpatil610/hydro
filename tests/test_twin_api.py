@@ -52,7 +52,13 @@ def test_twin_shape(sim_client):
 
 
 def test_twin_history_returns_persisted_rows(sim_client):
-    sim_client.app.state.poller.sample_once()
+    # History is decimated (default 300s cadence); set the cadence to one sim
+    # sample interval so a single sample_once persists one TwinSample here.
+    poller = sim_client.app.state.poller
+    interval = sim_client.app.state.device_set.world.clock.sample_interval_s
+    poller._twin_history_seconds = interval
+    poller._next_history_at = interval
+    poller.sample_once()
     rows = sim_client.get("/twin/history?hours=24").json()
     assert len(rows) >= 1
     assert {"timestamp", "biomass_g", "health", "ec_true",

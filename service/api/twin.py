@@ -176,6 +176,54 @@ class SpeedOut(BaseModel):
     sim_speed: float
 
 
+class ForwardReservoir(BaseModel):
+    reservoir_id: str
+    days_elapsed: float
+    stage: str
+    biomass_g: float
+    health: float
+    ph_true: float
+    ec_true: float
+    temp_true: float
+
+
+class ForwardOut(BaseModel):
+    projected_days: float
+    grow_id: int
+    reservoirs: list[ForwardReservoir]
+
+
+@router.get("/forward", response_model=ForwardOut)
+def forward(request: Request, days: float = Query(default=3.0, gt=0, le=60),
+            step_s: float = Query(default=3600.0, gt=0)) -> ForwardOut:
+    """Project the living grow forward on a THROWAWAY world (coarse step_s cadence,
+    default 1h). Never mutates the living world or its checkpoint."""
+    from hal.sim.build import build_world
+
+    live = _world_or_404(request)
+    state = live.to_state()  # locked read snapshot of the living grow
+    profile = request.app.state.profile
+    ghost = build_world(profile, seed=state.seed, ic_jitter=state.ic_jitter)
+    ghost.restore_state(state)
+    ghost.clock.sample_interval_s = step_s  # coarse cadence so multi-day is fast
+    target = ghost.clock.sim_time_s + days * 86400.0
+    while ghost.clock.sim_time_s < target:
+        ghost.step()
+    reservoirs = []
+    for rid in ghost.units:
+        snap = ghost.snapshot(rid)
+        reservoirs.append(ForwardReservoir(
+            reservoir_id=rid, days_elapsed=float(snap["days_elapsed"]),
+            stage=str(snap["stage"]), biomass_g=float(snap["biomass_g"]),
+            health=float(snap["health"]), ph_true=float(snap["ph_true"]),
+            ec_true=float(snap["ec_true"]), temp_true=float(snap["temp_true"]),
+        ))
+    return ForwardOut(
+        projected_days=(ghost.clock.sim_time_s - state.sim_time_s) / 86400.0,
+        grow_id=ghost.grow_id, reservoirs=reservoirs,
+    )
+
+
 @router.post("/speed", response_model=SpeedOut)
 def set_speed(request: Request, body: SpeedIn) -> SpeedOut:
     """Runtime time-lapse control (sim only). Applies from the next poll;

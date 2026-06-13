@@ -99,3 +99,18 @@ def test_twin_reports_grow_id(sim_client):
     # sim_client is the existing sim-mode TestClient fixture in this file.
     body = sim_client.get("/twin").json()
     assert body["grow_id"] == 1
+
+
+def test_forward_does_not_mutate_living_world(sim_client):
+    # Read the live World object directly so a background poll tick can't race
+    # a second /twin HTTP call. The forward projection must not touch it.
+    world = sim_client.app.state.device_set.world
+    before_t = world.clock.sim_time_s
+    before_grow = world.grow_id
+
+    proj = sim_client.get("/twin/forward", params={"days": 3}).json()
+
+    assert proj["projected_days"] >= 3
+    assert len(proj["reservoirs"]) == len(world.units)
+    assert world.clock.sim_time_s == before_t   # living world untouched
+    assert world.grow_id == before_grow

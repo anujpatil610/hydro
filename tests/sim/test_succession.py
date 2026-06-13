@@ -81,3 +81,30 @@ def test_succession_archives_reseeds_and_clears(tmp_path, monkeypatch):
     with Session(engine) as s:
         samples = s.exec(select(TwinSample)).all()
     assert all(r.stage != "vegetative" for r in samples)  # stale sample gone
+
+
+from service.config import Settings
+from service.main import create_app
+from fastapi.testclient import TestClient
+
+
+def test_service_resumes_from_checkpoint(tmp_path):
+    db = tmp_path / "hydro.db"
+    settings = Settings(
+        _env_file=None, profile="profiles/bench-sim.yaml", mode="sim",
+        db_path=str(db), datasets_dir=str(tmp_path / "ds"),
+        twin_history_seconds=10.0,
+    )
+    # First boot: poll a few times so the grow advances and checkpoints.
+    app = create_app(settings, start_poller=False)
+    with TestClient(app) as c:
+        for _ in range(3):
+            app.state.poller.sample_once()
+        t_before = app.state.device_set.world.clock.sim_time_s
+        assert t_before > 0
+
+    # Second boot on the same DB resumes — not back to day 0.
+    app2 = create_app(settings, start_poller=False)
+    with TestClient(app2) as c:
+        t_resumed = app2.state.device_set.world.clock.sim_time_s
+    assert t_resumed == t_before

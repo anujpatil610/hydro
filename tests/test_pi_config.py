@@ -41,9 +41,11 @@ def test_service_has_private_tmp():
     assert "PrivateTmp=yes" in content
 
 
-def test_service_restart_policy_is_on_failure():
+def test_service_restart_policy_is_always():
+    # Always-on living twin: restart on clean exits too (not just failures), so
+    # the 24/7 sim survives reboots/redeploys. StartLimitBurst caps crash-looping.
     content = HYDRO_SERVICE.read_text()
-    assert "Restart=on-failure" in content
+    assert "Restart=always" in content
     assert "StartLimitBurst=" in content
 
 

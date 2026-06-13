@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Engine, text
 from sqlmodel import Session, SQLModel, col, create_engine, delete, select
 
 from service.db.models import Reading, TwinCheckpoint, TwinSample, naive_utc
+
+if TYPE_CHECKING:  # annotation-only; the runtime import lives in load_checkpoint
+    # (kept lazy so the core session module stays scipy-free in real mode).
+    from hal.sim.world import WorldState
 
 # Columns added in Phase 2; absent from a Phase-1 hydro.db.
 _ADDED_COLUMNS: dict[str, str] = {
@@ -118,7 +123,7 @@ def save_checkpoint(session: Session, state: WorldState) -> None:
 
 def load_checkpoint(session: Session) -> WorldState | None:
     """Reconstruct the WorldState from checkpoint rows, or None if absent."""
-    from hal.sim.world import WorldState, _LIVE_FIELDS
+    from hal.sim.world import _LIVE_FIELDS, WorldState
 
     rows = session.exec(select(TwinCheckpoint)).all()
     if not rows:

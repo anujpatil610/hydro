@@ -6,7 +6,6 @@ build share reproducible streams."""
 from __future__ import annotations
 
 import numpy as np
-
 from service.profile.schema import Binding, Spec
 
 from hal.drivers.context import BuildContext

@@ -1,11 +1,14 @@
-from sqlmodel import Session
-
 from hal.sim.build import build_world
-from service.db.session import (
-    clear_twin_samples, init_db, load_checkpoint, make_engine, save_checkpoint,
-)
 from service.db.models import TwinSample, naive_utc
+from service.db.session import (
+    clear_twin_samples,
+    init_db,
+    load_checkpoint,
+    make_engine,
+    save_checkpoint,
+)
 from service.profile.loader import load_profile
+from sqlmodel import Session
 
 
 def _world():
@@ -46,8 +49,8 @@ def test_save_is_upsert_one_row_per_reservoir():
         world.step()
         save_checkpoint(s, world.to_state())
         s.commit()
-    from sqlmodel import select
     from service.db.models import TwinCheckpoint
+    from sqlmodel import select
     with Session(engine) as s:
         rows = s.exec(select(TwinCheckpoint)).all()
     assert len(rows) == len(world.units)  # upsert, not append

@@ -1,9 +1,12 @@
 # tests/sim/test_succession.py
 from pathlib import Path
 
+from fastapi.testclient import TestClient
 from hal.factory import build_device_set
+from service.config import Settings
 from service.db.models import TwinCheckpoint, TwinSample
 from service.db.session import init_db, make_engine
+from service.main import create_app
 from service.poller import Poller
 from service.profile.loader import load_profile
 from sqlmodel import Session, select
@@ -83,11 +86,6 @@ def test_succession_archives_reseeds_and_clears(tmp_path, monkeypatch):
     assert all(r.stage != "vegetative" for r in samples)  # stale sample gone
 
 
-from service.config import Settings
-from service.main import create_app
-from fastapi.testclient import TestClient
-
-
 def test_service_resumes_from_checkpoint(tmp_path):
     db = tmp_path / "hydro.db"
     settings = Settings(
@@ -97,7 +95,7 @@ def test_service_resumes_from_checkpoint(tmp_path):
     )
     # First boot: poll a few times so the grow advances and checkpoints.
     app = create_app(settings, start_poller=False)
-    with TestClient(app) as c:
+    with TestClient(app):
         for _ in range(3):
             app.state.poller.sample_once()
         t_before = app.state.device_set.world.clock.sim_time_s
@@ -105,6 +103,6 @@ def test_service_resumes_from_checkpoint(tmp_path):
 
     # Second boot on the same DB resumes — not back to day 0.
     app2 = create_app(settings, start_poller=False)
-    with TestClient(app2) as c:
+    with TestClient(app2):
         t_resumed = app2.state.device_set.world.clock.sim_time_s
     assert t_resumed == t_before

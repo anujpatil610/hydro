@@ -1,12 +1,12 @@
 import math
 
+from hal.sim.build import build_world
 from hal.sim.clock import SimClock
 from hal.sim.crop import load_crop
 from hal.sim.environment import Zone
 from hal.sim.plant import PlantModel
 from hal.sim.reservoir import ReservoirModel
 from hal.sim.world import ReservoirUnit, World
-from hal.sim.build import build_world
 from service.profile.loader import load_profile
 
 

@@ -11,11 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from hal.factory import build_device_set
+from sqlmodel import Session
 
 from service.api import actuators, datasets, health, sensors, topology, twin
 from service.config import Settings
-from sqlmodel import Session
-
 from service.db.session import init_db, load_checkpoint, make_engine
 from service.poller import Poller
 from service.profile.loader import load_profile

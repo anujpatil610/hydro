@@ -57,3 +57,25 @@ def test_noise_for_world_unknown_world_is_none():
     from hal.drivers.sim_drivers import noise_for_world
 
     assert noise_for_world(object()) is None
+
+
+def test_noise_seed_tracks_world_seed():
+    from hal.drivers.sim_drivers import noise_for_world
+    from hal.factory import build_device_set
+    from service.profile.loader import load_profile
+
+    ds = build_device_set(load_profile("profiles/bench-sim.yaml"), seed=42)
+    assert noise_for_world(ds.world).seed == 42
+
+
+def test_reset_noise_for_rebinds_seed_in_place():
+    from hal.drivers.sim_drivers import noise_for_world, reset_noise_for
+    from hal.factory import build_device_set
+    from service.profile.loader import load_profile
+
+    ds = build_device_set(load_profile("profiles/bench-sim.yaml"), seed=1)
+    nm = noise_for_world(ds.world)
+    ds.world.seed = 2
+    reset_noise_for(ds.world)
+    assert nm.seed == 2          # same NoiseModel object, reseeded (sensors stay wired)
+    assert nm.faults == []

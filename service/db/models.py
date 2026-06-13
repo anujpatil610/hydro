@@ -79,6 +79,29 @@ class TwinSample(SQLModel, table=True):
     faults: str = ""  # comma-joined "kind:metric" markers active at sample time
 
 
+class TwinCheckpoint(SQLModel, table=True):
+    """Always-on living twin: one resume row per reservoir, UPSERTed each poll.
+    World-level fields (grow_id/seed/ic_jitter/sim_time_s) are denormalized onto
+    every row. Static scaffold is reproduced by build_world(seed, ic_jitter)."""
+
+    reservoir_id: str = Field(primary_key=True)
+    grow_id: int
+    seed: int
+    ic_jitter: float
+    sim_time_s: float
+    biomass_g: float
+    days_elapsed: float
+    health: float
+    n_mass_mg: float
+    p_mass_mg: float
+    k_mass_mg: float
+    acc_mass_mg: float
+    ph: float
+    temp_c: float
+    volume_l: float
+    updated_at: datetime
+
+
 def npk_mg_l(snap: dict) -> tuple[float, float, float]:
     """(n, p, k) concentrations in mg/L from a World snapshot dict.
 

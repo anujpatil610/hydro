@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # 1.0 = live; ~360 renders a 35-day grow in ~14 min. Sim mode only; restart to apply.
     sim_speed: float = Field(default=1.0, gt=0)
 
+    # Always-on living twin (sim mode).
+    sim_seed: int = 0  # seed for the first living grow; +1 each succession
+    sim_ic_jitter: float = Field(default=0.15, ge=0)  # per-grow IC variation
+    twin_history_seconds: float = Field(default=300.0, gt=0)  # decimated history cadence
+    twin_living_subdir: str = "living"  # archive subdir under datasets_dir
+
     # Extra dev origins so the Vite dev server reaches the API before mDNS exists.
     cors_origins: tuple[str, ...] = (
         "http://localhost:5173",

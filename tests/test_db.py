@@ -142,6 +142,7 @@ def test_twin_history_filters_by_hours_and_reservoir(tmp_path) -> None:
 
 
 def test_prune_old_also_prunes_twin_samples(tmp_path) -> None:
+    # TwinSample is now EXEMPT from prune_old; both rows survive.
     engine = _engine(tmp_path)
     now = naive_utc()
     with Session(engine) as s:
@@ -150,4 +151,21 @@ def test_prune_old_also_prunes_twin_samples(tmp_path) -> None:
         s.commit()
         prune_old(s, retention_hours=24)
         s.commit()
-        assert len(twin_history(s, hours=999)) == 1
+        assert len(twin_history(s, hours=999)) == 2  # exempt from time-based prune
+
+
+def test_prune_old_keeps_twin_samples():
+    engine = make_engine(":memory:")
+    init_db(engine)
+    old = naive_utc() - timedelta(hours=48)
+    with Session(engine) as s:
+        s.add(TwinSample(
+            timestamp=old, reservoir_id="resA", stage="germination",
+            biomass_g=0.1, health=1.0, ph_true=5.8, ec_true=1.4, temp_true=21.0,
+            volume_l=20.0, n_mg_l=100.0, p_mg_l=20.0, k_mg_l=80.0,
+        ))
+        s.commit()
+        prune_old(s, retention_hours=24)
+        s.commit()
+        rows = s.exec(select(TwinSample)).all()
+    assert len(rows) == 1  # twin history is exempt; managed by per-grow archive

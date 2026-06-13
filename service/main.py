@@ -11,10 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from hal.factory import build_device_set
+from sqlmodel import Session
 
 from service.api import actuators, datasets, health, sensors, topology, twin
 from service.config import Settings
-from service.db.session import init_db, make_engine
+from service.db.session import init_db, load_checkpoint, make_engine
 from service.poller import Poller
 from service.profile.loader import load_profile
 
@@ -30,14 +31,28 @@ def create_app(settings: Settings | None = None, *, start_poller: bool = True) -
         meta = profile.profile
         engine = make_engine(settings.db_path)
         init_db(engine)
+        with Session(engine) as session:
+            checkpoint = load_checkpoint(session)
+        seed = checkpoint.seed if checkpoint else settings.sim_seed
+        ic_jitter = checkpoint.ic_jitter if checkpoint else settings.sim_ic_jitter
         device_set = build_device_set(
-            profile, calibration_path=Path(settings.calibration_path)
+            profile, calibration_path=Path(settings.calibration_path),
+            seed=seed, ic_jitter=ic_jitter,
         )
-        if device_set.world is not None and settings.sim_speed != 1.0:
-            clock = device_set.world.clock
-            clock.speed = settings.sim_speed
-            clock.sample_interval_s = meta.poll_seconds * settings.sim_speed
-        poller = Poller(device_set, engine, meta.poll_seconds, meta.retention_hours)
+        if device_set.world is not None:
+            if settings.sim_speed != 1.0:
+                clock = device_set.world.clock
+                clock.speed = settings.sim_speed
+                clock.sample_interval_s = meta.poll_seconds * settings.sim_speed
+            if checkpoint is not None:
+                device_set.world.restore_state(checkpoint)
+        poller = Poller(
+            device_set, engine, meta.poll_seconds, meta.retention_hours,
+            twin_history_seconds=settings.twin_history_seconds,
+            datasets_dir=settings.datasets_dir,
+            living_subdir=settings.twin_living_subdir,
+            profile_path=settings.profile, sim_ic_jitter=settings.sim_ic_jitter,
+        )
         app.state.settings = settings
         app.state.profile = profile
         app.state.engine = engine

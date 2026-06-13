@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Engine, text
 from sqlmodel import Session, SQLModel, col, create_engine, delete, select
 
-from service.db.models import Reading, TwinSample, naive_utc
+from service.db.models import Reading, TwinCheckpoint, TwinSample, naive_utc
+
+if TYPE_CHECKING:  # annotation-only; the runtime import lives in load_checkpoint
+    # (kept lazy so the core session module stays scipy-free in real mode).
+    from hal.sim.world import WorldState
 
 # Columns added in Phase 2; absent from a Phase-1 hydro.db.
 _ADDED_COLUMNS: dict[str, str] = {
@@ -51,12 +56,13 @@ def migrate_schema(engine: Engine) -> None:
 
 
 def prune_old(session: Session, retention_hours: int) -> int:
-    """Delete readings older than the retention window. Returns rows removed."""
+    """Delete sensor readings older than the retention window. Returns rows removed.
+
+    TwinSample is intentionally exempt: the living-twin history persists for the
+    whole grow and is cleared at succession (see clear_twin_samples)."""
     cutoff = naive_utc() - timedelta(hours=retention_hours)
     result = session.exec(delete(Reading).where(col(Reading.timestamp) < cutoff))
-    removed = int(result.rowcount or 0)
-    twin_result = session.exec(delete(TwinSample).where(col(TwinSample.timestamp) < cutoff))
-    return removed + int(twin_result.rowcount or 0)
+    return int(result.rowcount or 0)
 
 
 def latest_per_device(session: Session) -> list[Reading]:
@@ -96,3 +102,43 @@ def twin_history(
         stmt = stmt.where(col(TwinSample.reservoir_id) == reservoir_id)
     stmt = stmt.order_by(col(TwinSample.timestamp).asc())
     return list(session.exec(stmt).all())
+
+
+def save_checkpoint(session: Session, state: WorldState) -> None:
+    """UPSERT one checkpoint row per reservoir (no append growth)."""
+    now = naive_utc()
+    for rid, fields in state.reservoirs.items():
+        row = session.get(TwinCheckpoint, rid)
+        common = dict(
+            grow_id=state.grow_id, seed=state.seed, ic_jitter=state.ic_jitter,
+            sim_time_s=state.sim_time_s, updated_at=now, **fields,
+        )
+        if row is None:
+            session.add(TwinCheckpoint(reservoir_id=rid, **common))
+        else:
+            for key, value in common.items():
+                setattr(row, key, value)
+            session.add(row)
+
+
+def load_checkpoint(session: Session) -> WorldState | None:
+    """Reconstruct the WorldState from checkpoint rows, or None if absent."""
+    from hal.sim.world import _LIVE_FIELDS, WorldState
+
+    rows = session.exec(select(TwinCheckpoint)).all()
+    if not rows:
+        return None
+    reservoirs = {
+        r.reservoir_id: {f: getattr(r, f) for f in _LIVE_FIELDS} for r in rows
+    }
+    head = rows[0]
+    return WorldState(
+        grow_id=head.grow_id, seed=head.seed, ic_jitter=head.ic_jitter,
+        sim_time_s=head.sim_time_s, reservoirs=reservoirs,
+    )
+
+
+def clear_twin_samples(session: Session) -> int:
+    """Delete all TwinSample rows (called at succession). Returns rows removed."""
+    result = session.exec(delete(TwinSample))
+    return int(result.rowcount or 0)

@@ -1,11 +1,13 @@
 import math
 
+from hal.sim.build import build_world
 from hal.sim.clock import SimClock
 from hal.sim.crop import load_crop
 from hal.sim.environment import Zone
 from hal.sim.plant import PlantModel
 from hal.sim.reservoir import ReservoirModel
 from hal.sim.world import ReservoirUnit, World
+from service.profile.loader import load_profile
 
 
 def _unit():
@@ -61,3 +63,18 @@ def test_run_is_deterministic():
         a.step()
         b.step()
     assert a.snapshot("r1")["biomass_g"] == b.snapshot("r1")["biomass_g"]
+
+
+def test_harvest_day_is_sum_of_stage_days():
+    world = build_world(load_profile("profiles/bench-sim.yaml"))
+    rid = next(iter(world.units))
+    crop = world.units[rid].plant.crop
+    assert world.harvest_day() == sum(s.days for s in crop.stages)
+
+
+def test_harvest_ready_flips_at_harvest_day():
+    world = build_world(load_profile("profiles/bench-sim.yaml"))
+    assert world.harvest_ready() is False
+    for u in world.units.values():
+        u.plant.days_elapsed = world.harvest_day()
+    assert world.harvest_ready() is True

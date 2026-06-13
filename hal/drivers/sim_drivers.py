@@ -5,6 +5,7 @@ build share reproducible streams."""
 
 from __future__ import annotations
 
+import numpy as np
 from service.profile.schema import Binding, Spec
 
 from hal.drivers.context import BuildContext
@@ -21,7 +22,7 @@ def _noise_for(ctx: BuildContext) -> NoiseModel:
     key = id(ctx.world)
     nm = _noise_cache.get(key)
     if nm is None:
-        nm = NoiseModel(seed=1234)
+        nm = NoiseModel(seed=ctx.world.seed)
         _noise_cache[key] = nm
     return nm
 
@@ -29,6 +30,17 @@ def _noise_for(ctx: BuildContext) -> NoiseModel:
 def noise_for_world(world: object) -> NoiseModel | None:
     """The shared NoiseModel for a built World (None if never built)."""
     return _noise_cache.get(id(world))
+
+
+def reset_noise_for(world: object) -> None:
+    """Reseed the cached NoiseModel in place to the world's current seed and clear
+    transient state, so sensors holding the same NoiseModel observe a fresh grow."""
+    nm = _noise_cache.get(id(world))
+    if nm is not None:
+        nm.seed = world.seed  # type: ignore[attr-defined]
+        nm._rng = np.random.default_rng(world.seed)  # type: ignore[attr-defined]
+        nm._stuck.clear()
+        nm.faults = []
 
 
 def _sensor_builder(kind: str):

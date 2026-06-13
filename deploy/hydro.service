@@ -11,7 +11,7 @@ WorkingDirectory=%h/hydro
 Environment=HYDRO_PROFILE=profiles/bench.yaml
 EnvironmentFile=%h/hydro/.env
 ExecStart=%h/hydro/.venv/bin/uvicorn service.main:app --host $HYDRO_HOST --port $HYDRO_PORT
-Restart=on-failure
+Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
@@ -21,7 +21,7 @@ SyslogIdentifier=hydro
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-ReadWritePaths=%h/hydro/data %h/hydro/.venv
+ReadWritePaths=%h/hydro/data %h/hydro/data/datasets %h/hydro/.venv
 
 [Install]
 WantedBy=default.target

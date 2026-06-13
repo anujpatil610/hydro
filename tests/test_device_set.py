@@ -195,3 +195,13 @@ def test_real_build_shares_one_ads_per_i2c_addr(monkeypatch, tmp_path) -> None:
     assert counters["ads"] == 1
     assert counters["i2c"] == 1
     assert counters["relay"] == [17]
+
+
+def test_build_device_set_threads_seed_and_jitter_into_world():
+    from hal.factory import build_device_set
+
+    profile = load_profile("profiles/bench-sim.yaml")
+    ds = build_device_set(profile, seed=5, ic_jitter=0.1)
+    assert ds.world is not None
+    assert ds.world.seed == 5
+    assert ds.world.ic_jitter == 0.1

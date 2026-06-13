@@ -29,7 +29,8 @@ from hal.registry import REGISTRY
 
 
 def build_device_set(
-    profile: ProfileFile, *, calibration_path: Path | None = None
+    profile: ProfileFile, *, calibration_path: Path | None = None,
+    seed: int = 0, ic_jitter: float = 0.0,
 ) -> DeviceSet:
     """Construct every device the profile declares, keyed by id."""
     import hal.drivers  # noqa: F401  (populate the registry on first use)
@@ -40,7 +41,7 @@ def build_device_set(
     if any(resolved_mode(d, profile.profile) == "sim" for d in profile.devices):
         from hal.sim.build import build_world
 
-        world = build_world(profile)
+        world = build_world(profile, seed=seed, ic_jitter=ic_jitter)
     devices: dict[str, object] = {}
     for dev in profile.devices:
         mode = resolved_mode(dev, profile.profile)

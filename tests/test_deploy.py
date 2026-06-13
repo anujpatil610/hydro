@@ -96,3 +96,9 @@ def test_health_endpoint_mock_mode(client):
         assert "metric" in item, f"Missing 'metric' key in {item}"
         assert "value" in item, f"Missing 'value' key in {item}"
         assert "unit" in item, f"Missing 'unit' key in {item}"
+
+
+def test_service_unit_is_always_on_and_can_write_datasets():
+    unit = HYDRO_SERVICE.read_text()
+    assert "Restart=always" in unit
+    assert "data/datasets" in unit  # archive-on-harvest needs write access

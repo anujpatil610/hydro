@@ -93,3 +93,9 @@ def test_stage_progress_math():
     assert stage_progress(stages, days_elapsed=2.5) == ("germination", 0.5)
     name, p = stage_progress(stages, days_elapsed=99.0)
     assert name == "mature" and p == 1.0
+
+
+def test_twin_reports_grow_id(sim_client):
+    # sim_client is the existing sim-mode TestClient fixture in this file.
+    body = sim_client.get("/twin").json()
+    assert body["grow_id"] == 1

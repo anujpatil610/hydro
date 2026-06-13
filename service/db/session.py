@@ -51,12 +51,13 @@ def migrate_schema(engine: Engine) -> None:
 
 
 def prune_old(session: Session, retention_hours: int) -> int:
-    """Delete readings older than the retention window. Returns rows removed."""
+    """Delete sensor readings older than the retention window. Returns rows removed.
+
+    TwinSample is intentionally exempt: the living-twin history persists for the
+    whole grow and is cleared at succession (see clear_twin_samples)."""
     cutoff = naive_utc() - timedelta(hours=retention_hours)
     result = session.exec(delete(Reading).where(col(Reading.timestamp) < cutoff))
-    removed = int(result.rowcount or 0)
-    twin_result = session.exec(delete(TwinSample).where(col(TwinSample.timestamp) < cutoff))
-    return removed + int(twin_result.rowcount or 0)
+    return int(result.rowcount or 0)
 
 
 def latest_per_device(session: Session) -> list[Reading]:
